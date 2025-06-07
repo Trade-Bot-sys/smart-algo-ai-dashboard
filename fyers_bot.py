@@ -180,10 +180,46 @@ def start_scheduler():
     schedule.every().day.at("16:30").do(send_trade_summary_email)
     threading.Thread(target=lambda: [schedule.run_pending() or time.sleep(60)], daemon=True).start()
 
-def main_dashboard():
-    st.title("🚀 Smart AI Trading Bot with Multi-Strategy + Fyers")
-    st.success(f"✅ Loaded {len(STOCK_LIST)} Nifty 500 stocks.")
+def render_dashboard():
+    st.set_page_config(layout="wide")
+    st.title("📊 Smart AI Trading Dashboard")
+    
+    # Portfolio Positions
+    st.subheader("📦 Current Positions (Fyers)")
+    positions = get_fyers_positions()
+    if positions:
+        df_pos = pd.DataFrame(positions)
+        st.dataframe(df_pos[["symbol", "netQty", "avgPrice", "pnl"]])
+    else:
+        st.info("No open positions available.")
+
+    # Funds Available
+    st.subheader("💰 Account Funds (Fyers)")
+    funds = get_fyers_funds()
+    if funds:
+        df_fund = pd.DataFrame(funds)
+        if not df_fund.empty:
+            st.dataframe(df_fund[["title", "equityAmount", "collateralAmount", "net"]])
+    else:
+        st.warning("Could not fetch fund details.")
+
+    # Profit / Loss chart
+    st.subheader("📈 Cumulative PnL Chart")
     plot_trade_history()
 
+    # Stock Analysis Insights
+    st.subheader("🧠 Stock Insights (Multi-Strategy AI Signals)")
+    if st.button("🔍 Analyze Nifty 500 Now"):
+        selected_signals = []
+        for symbol in STOCK_LIST[:20]:  # Limit to 20 for performance
+            signal = analyze_stock(symbol)
+            if signal == "BUY":
+                selected_signals.append(symbol)
+        if selected_signals:
+            st.success(f"💡 Buy Signals: {', '.join(selected_signals)}")
+        else:
+            st.info("No BUY signals currently.")
+
+# Start everything
 start_scheduler()
-main_dashboard()
+render_dashboard()
