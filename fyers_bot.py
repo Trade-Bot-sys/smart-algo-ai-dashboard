@@ -1,9 +1,10 @@
 import os
 os.system("pip install fyers-apiv3==3.1.7")
+
 import time
 import pandas as pd
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.FyersApp import FyersApp
+from fyers_apiv3.fyers_app import FyersApp  # ✅ lowercase
 
 # Load credentials from environment (Streamlit secrets or .env)
 APP_ID = os.getenv("FYERS_APP_ID")
