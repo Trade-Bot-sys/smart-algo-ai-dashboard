@@ -3,6 +3,16 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
+
+capital = st.number_input("Capital per trade (₹)", value=1000)
+tp = st.slider("Take Profit %", 1, 10, value=2)
+sl = st.slider("Stop Loss %", 1, 10, value=1)
+
+if st.button("Run AI Trade Now"):
+    signal_df = pd.DataFrame([{"symbol": symbol, "signal": data['Signal']}])
+    run_trading_bot(signal_df, live=live_mode, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
+    st.success("Trade processed in " + ("Live" if live_mode else "Simulation") + " mode.")
+  
 from fyers_bot import run_trading_bot
 
 st.title("📊 Smart AI Trading Dashboard (Live Fyers Mode)")
