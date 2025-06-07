@@ -1,16 +1,17 @@
 import os
 import time
 import pandas as pd
+import streamlit as st
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.fyers_app import fyersApp  # ✅ lowercase
+from fyers_apiv3.fyers_app import FyersApp  # ✅ Correct import
 
-# Load credentials from environment (Streamlit secrets or .env)
-APP_ID = os.getenv("FYERS_APP_ID")
-APP_SECRET = os.getenv("FYERS_APP_SECRET")
-REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
+# Load credentials securely from Streamlit secrets
+APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
+APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
+REDIRECT_URI = st.secrets["FYERS"]["FYERS_REDIRECT_URI"]
 ACCESS_TOKEN_PATH = "access_token.txt"
 
-# Generate new access token manually (only once)
+# Generate new access token (manual step required)
 def generate_access_token():
     app = FyersApp(
         client_id=APP_ID,
@@ -36,9 +37,10 @@ def load_access_token():
         with open(ACCESS_TOKEN_PATH, 'r') as f:
             return f.read().strip()
     else:
-        return generate_access_token()
+        st.warning("Access token not found. Please generate it locally using terminal.")
+        raise RuntimeError("Access token not available on Streamlit Cloud. Generate it locally first.")
 
-# Send order to Fyers API
+# Place order using Fyers API
 def place_order(fyers, symbol, side, qty=1):
     order = {
         "symbol": symbol,
@@ -73,7 +75,7 @@ def run_trading_bot(signals_df, live=True):
                 place_order(fyers, symbol, action, qty=1)
             log_trade(symbol, action)
 
-# Log trades to CSV
+# Log executed trades
 def log_trade(symbol, action):
     with open("trade_log.csv", "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action}\n")
