@@ -1,25 +1,25 @@
 import os
 import time
+from datetime import datetime
+import smtplib
+from email.message import EmailMessage
+import streamlit as st
 import pandas as pd
 import yfinance as yf
-import streamlit as st
 import plotly.graph_objects as go
-from fyers_apiv3 import fyersModel
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from fyers_bot import run_trading_bot
 
-# Setup log directory
+# Setup logs
 os.makedirs("logs", exist_ok=True)
 
-# Title and Trading Mode
 st.title("📊 Smart AI Trading Dashboard (Live Fyers Mode)")
+
+# Trading mode
 mode = st.radio("Select Trading Mode:", ["Simulation", "Live Trading"], index=0)
 live_mode = mode == "Live Trading"
 
-# Capital, TP, SL inputs
+# User inputs
 capital = st.number_input("Capital per trade (₹)", value=1000)
 tp = st.slider("Take Profit %", 1, 10, value=2)
 sl = st.slider("Stop Loss %", 1, 10, value=1)
@@ -28,12 +28,12 @@ sl = st.slider("Stop Loss %", 1, 10, value=1)
 stocks = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
 symbol = st.selectbox("Choose Stock:", stocks)
 
-# Fetch data
+# Load data and generate dummy signal
 data = yf.download(symbol, period="3mo", interval="1d")
 data['Signal'] = ["HOLD"] * len(data)
-data['Signal'].iloc[-1] = "BUY"
+data['Signal'].iloc[-1] = "BUY"  # Dummy signal for testing
 
-# Show current signal
+# Show Signal
 st.write("## Signal: ", data['Signal'].iloc[-1])
 
 # Plot chart
@@ -49,16 +49,14 @@ elif data['Signal'].iloc[-1] == "SELL":
                              marker=dict(color="red", size=12), name="SELL"))
 st.plotly_chart(fig)
 
-# Run Trade Button
+# Run trade
 if st.button("Run AI Trade Now"):
     signal_df = pd.DataFrame([{"symbol": symbol, "signal": data['Signal'].iloc[-1]}])
     run_trading_bot(signal_df, live=live_mode, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
     st.success("Trade processed in " + ("Live" if live_mode else "Simulation") + " mode!")
 
-# Scheduler for summary email
-scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
-
-def send_summary():
+# Email summary sender
+def send_trade_summary_email():
     if os.path.exists("trade_log.csv"):
         df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action"])
         today = datetime.now().strftime("%Y-%m-%d")
@@ -67,18 +65,28 @@ def send_summary():
     else:
         body = "Trade log file not found."
 
-    message = Mail(
-        from_email='tradingstrategieswithram@gmail.com',
-        to_emails='tradingstrategieswithram@gmail.com',
-        subject='Daily Trade Summary - Smart AI Bot',
-        plain_text_content=body
-    )
-    try:
-        sg = SendGridAPIClient(st.secrets["SENDGRID_API_KEY"])
-        sg.send(message)
-        print("✅ Daily trade summary sent.")
-    except Exception as e:
-        print("❌ Failed to send summary:", e)
+    msg = EmailMessage()
+    msg['Subject'] = '📈 Daily Trade Summary - Smart AI Bot'
+    msg['From'] = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
+    msg['To'] = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
+    msg.set_content(body)
 
-scheduler.add_job(send_summary, "cron", hour=16, minute=30)
-scheduler.start()
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(st.secrets["EMAIL"]["EMAIL_ADDRESS"], st.secrets["EMAIL"]["EMAIL_PASSWORD"])
+            smtp.send_message(msg)
+            print("✅ Daily trade summary email sent.")
+    except Exception as e:
+        print("❌ Email send failed:", e)
+
+# Test manual summary send
+if st.button("Send Daily Trade Summary Now"):
+    send_trade_summary_email()
+    st.success("Daily trade summary email sent.")
+
+# Scheduler setup (runs only once)
+if "scheduler_started" not in st.session_state:
+    scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
+    scheduler.add_job(send_trade_summary_email, "cron", hour=16, minute=30)
+    scheduler.start()
+    st.session_state.scheduler_started = True
