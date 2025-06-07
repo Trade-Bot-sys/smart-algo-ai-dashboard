@@ -7,3 +7,4 @@ apscheduler
 requests
 schedule
 matplotlib
+googlesearch-python
