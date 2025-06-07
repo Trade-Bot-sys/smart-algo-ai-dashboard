@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import streamlit as st
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.fyers_app import FyersApp  # ✅ Correct import
+from fyers_apiv3.FyersApp import FyersApp  # ✅ Correct import
 
 # Load credentials securely from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
@@ -33,11 +33,10 @@ def generate_access_token():
 
 # Load or generate token
 def load_access_token():
-    if os.path.exists(ACCESS_TOKEN_PATH):
-        with open(ACCESS_TOKEN_PATH, 'r') as f:
-            return f.read().strip()
-    else:
-        st.warning("Access token not found. Please generate it locally using terminal.")
+    try:
+        return st.secrets["FYERS"]["ACCESS_TOKEN"]
+    except KeyError:
+        st.error("Access token not found in Streamlit secrets. Please add it to the secrets configuration.")
         raise RuntimeError("Access token not available on Streamlit Cloud. Generate it locally first.")
 
 # Place order using Fyers API
