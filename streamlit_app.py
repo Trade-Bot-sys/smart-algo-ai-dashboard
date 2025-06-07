@@ -1,3 +1,5 @@
+# 📈 Smart AI Trading Dashboard (Expanded Version with Full Features)
+
 import os
 import smtplib
 from email.message import EmailMessage
@@ -12,10 +14,11 @@ from fyers_bot import (
     run_trading_bot,
     get_fyers_positions,
     get_fyers_funds,
-    send_telegram_alert, 
-    send_trade_summary_email  # ✅ Add this
+    send_telegram_alert,
+    send_trade_summary_email
 )
-# Load secrets
+
+# ✅ Load Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
@@ -23,21 +26,22 @@ EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
 
-# Fyers session
+# ✅ Setup Fyers session
 fyers = fyersModel.FyersModel(
     client_id=APP_ID,
     token=f"{APP_ID}:{ACCESS_TOKEN}",
     log_path="logs/"
 )
 
-# Load Nifty 500 list
+# ✅ Load Nifty 500 stock list
 try:
     nifty_df = pd.read_csv("data/nifty500list.csv")
     STOCK_LIST = [f"{s}.NS" for s in nifty_df["Symbol"].dropna()]
 except:
     STOCK_LIST = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
 
-# News sentiment scoring
+# ✅ Google News Sentiment Analysis
+@st.cache_data(ttl=3600)
 def news_sentiment_score(symbol):
     query = f"{symbol} stock news site:moneycontrol.com OR site:economictimes.indiatimes.com"
     try:
@@ -45,7 +49,6 @@ def news_sentiment_score(symbol):
     except:
         return 0
 
-# News-based top 5 stocks
 @st.cache_data(ttl=3600)
 def get_top_news_stocks():
     results = []
@@ -55,8 +58,8 @@ def get_top_news_stocks():
     sorted_stocks = sorted(results, key=lambda x: x[1], reverse=True)
     return [s[0] for s in sorted_stocks[:5]]
 
-# Signal analysis
-@st.cache_data(ttl=3600)
+# ✅ AI Strategy Signal
+@st.cache_data(ttl=600)
 def get_strategy_signal(symbol):
     try:
         df = yf.download(symbol, period="15d", interval="1h")
@@ -71,37 +74,36 @@ def get_strategy_signal(symbol):
         volume_signal = df["Volume"].iloc[-1] > 1.2 * df["VolumeAvg"].iloc[-1]
         macd_signal = df["MACD"].iloc[-1] > 0
 
-        if ema_signal and volume_signal and macd_signal:
-            return "BUY"
-        return "HOLD"
+        return "BUY" if ema_signal and volume_signal and macd_signal else "HOLD"
     except:
         return "HOLD"
 
-# 📊 UI Start
-st.title("📈 Smart AI Trading Dashboard with Live News & Strategy")
+# ✅ UI: Smart Dashboard
+st.set_page_config(layout="wide")
+st.title("📈 Smart AI Trading Dashboard with Live News, Signals, and Auto Trade")
 
-# Trade params
+# Inputs
 capital = st.number_input("Capital per Trade (₹)", value=1000)
 tp = st.slider("Take Profit %", 1, 10, value=2)
 sl = st.slider("Stop Loss %", 1, 10, value=1)
 
-# Display signal stock from news
+# Get recommended stock from news + strategy
 top_stocks = get_top_news_stocks()
 symbol = top_stocks[0] if top_stocks else "RELIANCE.NS"
-data = yf.download(symbol, period="3mo", interval="1d")
 signal = get_strategy_signal(symbol)
+data = yf.download(symbol, period="3mo", interval="1d")
 data['Signal'] = ["HOLD"] * len(data)
 data.loc[data.index[-1], 'Signal'] = signal
 
+# Show Signal + Chart
 st.subheader(f"📍 Signal for {symbol}: {signal}")
 fig = go.Figure()
 fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])
-last_price = data['Close'].iloc[-1]
 if signal == "BUY":
-    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[last_price], mode="markers", marker=dict(color="green", size=12), name="BUY Signal"))
+    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[data['Close'].iloc[-1]], mode="markers", marker=dict(color="green", size=12), name="BUY"))
 st.plotly_chart(fig)
 
-# Auto run trade at 9:15 AM with stop loss and take profit
+# ✅ Scheduler (Auto at 9:15 and 4:30)
 if "scheduler_started" not in st.session_state:
     def auto_trade():
         signal_df = pd.DataFrame([{"symbol": symbol, "signal": get_strategy_signal(symbol)}])
@@ -115,10 +117,10 @@ if "scheduler_started" not in st.session_state:
     scheduler.add_job(auto_summary, "cron", hour=16, minute=30)
     scheduler.start()
     st.session_state.scheduler_started = True
-    st.toast("✅ Trade & Summary Scheduler Set: 9:15 AM & 4:30 PM IST")
+    st.toast("✅ Auto trading and summary scheduled")
 
-# Live positions
-st.header("📦 Portfolio (Fyers)")
+# ✅ Portfolio Display
+st.header("📦 Live Portfolio")
 positions = get_fyers_positions()
 if positions:
     df_positions = pd.DataFrame(positions)
@@ -127,35 +129,32 @@ if positions:
 else:
     st.info("No open positions.")
 
-# Available funds
-st.header("💰 Funds (Fyers)")
+# ✅ Funds Display
+st.header("💰 Available Funds")
 funds = get_fyers_funds()
 if funds:
     df_funds = pd.DataFrame(funds)
     st.dataframe(df_funds[["title", "equityAmount", "collateralAmount", "net"]])
 else:
-    st.warning("Unable to fetch fund details.")
+    st.warning("Funds unavailable")
 
-# Trade summary chart
-st.subheader("📈 Cumulative PnL Chart")
+# ✅ Cumulative PnL Chart
+st.header("📊 PnL History")
 if os.path.exists("trade_log.csv"):
-    try:
-        df_log = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
-        df_log["timestamp"] = pd.to_datetime(df_log["timestamp"], errors="coerce")
-        df_log = df_log.dropna()
-        df_log["PnL"] = df_log.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
-        df_log = df_log.sort_values("timestamp")
-        df_log["CumulativePnL"] = df_log["PnL"].cumsum()
-        st.line_chart(df_log.set_index("timestamp")["CumulativePnL"])
-    except Exception as e:
-        st.warning(f"Chart error: {e}")
+    df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = df.dropna()
+    df["PnL"] = df.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
+    df = df.sort_values("timestamp")
+    df["CumulativePnL"] = df["PnL"].cumsum()
+    st.line_chart(df.set_index("timestamp")["CumulativePnL"])
 
-# Telegram test button
+# ✅ Telegram Test
 if st.button("🔔 Test Telegram Alert"):
     send_telegram_alert("TEST", "BUY", 100, 102, 98)
-    st.success("✅ Telegram alert sent!")
+    st.success("Telegram alert sent!")
 
-# Email summary manually
-if st.button("📤 Send Daily Trade Summary Now"):
+# ✅ Manual Summary Send
+if st.button("📤 Send Daily Summary Now"):
     send_trade_summary_email()
-    st.success("📨 Summary email sent successfully!")
+    st.success("📧 Summary email sent!")
