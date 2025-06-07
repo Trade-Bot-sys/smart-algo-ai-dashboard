@@ -4,11 +4,16 @@ import pandas as pd
 import streamlit as st
 from fyers_apiv3 import fyersModel
 
-# ✅ Load credentials securely from Streamlit secrets
+# Load secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 
-# ✅ Place order using Fyers API
+# ✅ Create logs folder if not exists
+LOG_DIR = "logs"
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+# Place order
 def place_order(fyers, symbol, side, qty=1):
     order = {
         "symbol": symbol,
@@ -27,12 +32,12 @@ def place_order(fyers, symbol, side, qty=1):
     print("\n[TRADE EXECUTED]", side, symbol, "| Response:", response)
     return response
 
-# ✅ Run the AI trading bot
+# ✅ Run bot
 def run_trading_bot(signals_df, live=True):
     fyers = fyersModel.FyersModel(
         client_id=APP_ID,
         token=f"{APP_ID}:{ACCESS_TOKEN}",
-        log_path="logs"
+        log_path=LOG_DIR + "/"  # Must end with slash
     )
     for _, row in signals_df.iterrows():
         symbol = row['symbol']
@@ -42,7 +47,7 @@ def run_trading_bot(signals_df, live=True):
                 place_order(fyers, symbol, action, qty=1)
             log_trade(symbol, action)
 
-# ✅ Log trade history
+# ✅ Log
 def log_trade(symbol, action):
     with open("trade_log.csv", "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action}\n")
