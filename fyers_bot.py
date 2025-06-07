@@ -78,7 +78,13 @@ def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2
 
             # ✅ LOG THE TRADE
             log_trade(symbol, action, qty, price, tp_price, sl_price)
-
+def get_fyers_positions(fyers):
+    try:
+        positions = fyers.positions()
+        return positions.get("netPositions", [])
+    except Exception as e:
+        print("[ERROR] Failed to fetch positions:", e)
+        return []
 # Send daily summary email
 def send_trade_summary_email():
     email_from = st.secrets["EMAIL"]["EMAIL_FROM"]
