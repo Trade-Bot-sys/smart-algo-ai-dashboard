@@ -11,6 +11,9 @@ import schedule
 import threading
 import matplotlib.pyplot as plt
 
+# ✅ Ensure logs folder exists
+os.makedirs("logs", exist_ok=True)
+
 # Load credentials securely from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
