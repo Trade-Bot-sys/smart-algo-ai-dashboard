@@ -150,7 +150,9 @@ if os.path.exists("trade_log.csv"):
     df = df.sort_values("timestamp")
     df["CumulativePnL"] = df["PnL"].cumsum()
     st.line_chart(df.set_index("timestamp")["CumulativePnL"])
-    stock_options = df_log["symbol"].dropna().unique().tolist()
+    
+    # 🔄 Use df instead of df_log
+    stock_options = df["symbol"].dropna().unique().tolist()
     selected_stock = st.selectbox("Select Stock", stock_options, index=0 if stock_options else None)
 
 if selected_stock:
