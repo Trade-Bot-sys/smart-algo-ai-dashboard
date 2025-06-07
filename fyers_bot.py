@@ -1,5 +1,4 @@
 import os
-os.system("pip install fyers-api==1.0.3")
 import time
 import pandas as pd
 
