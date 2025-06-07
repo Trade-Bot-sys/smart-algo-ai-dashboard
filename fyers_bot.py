@@ -1,15 +1,8 @@
 import os
 import time
 import pandas as pd
-# Auto-install fyers-api if missing
-try:
-    from fyers_api.FyersApp import FyersApp
-    from fyers_api import fyersModel
-except ModuleNotFoundError:
-    import os
-    os.system("pip install fyers-api==1.0.3")
-    from fyers_api.FyersApp import FyersApp
-    from fyers_api import fyersModel
+from fyers_apiv3.FyersApp import FyersApp
+from fyers_apiv3 import fyersModel
 
 # Load credentials from environment (Streamlit secrets or .env)
 APP_ID = os.getenv("FYERS_APP_ID")
