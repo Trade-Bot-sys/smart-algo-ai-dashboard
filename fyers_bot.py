@@ -1,8 +1,8 @@
 import os
 import time
 import pandas as pd
-from fyers_apiv3.fyers_app import FyersApp
-from fyers_apiv3 import fyersModel
+from fyers_api.FyersApp import FyersApp  # ✅ Correct
+from fyers_api import fyersModel         # ✅ Correct
 
 # Load credentials from environment (Streamlit secrets or .env)
 APP_ID = os.getenv("FYERS_APP_ID")
