@@ -8,8 +8,13 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
-from fyers_bot import run_trading_bot, get_fyers_positions, get_fyers_funds, send_telegram_alert
-
+from fyers_bot import (
+    run_trading_bot,
+    get_fyers_positions,
+    get_fyers_funds,
+    send_telegram_alert, 
+    send_trade_summary_email  # ✅ Add this
+)
 # Load secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
