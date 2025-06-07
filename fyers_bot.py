@@ -3,43 +3,12 @@ import time
 import pandas as pd
 import streamlit as st
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.FyersApp import FyersApp  # ✅ Correct import
 
-# Load credentials securely from Streamlit secrets
+# ✅ Load credentials securely from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
-APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
-REDIRECT_URI = st.secrets["FYERS"]["FYERS_REDIRECT_URI"]
-ACCESS_TOKEN_PATH = st.secrets["FYERS"]["ACCESS_TOKEN"]
+ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 
-# Generate new access token (manual step required)
-def generate_access_token():
-    app = FyersApp(
-        client_id=APP_ID,
-        secret_key=APP_SECRET,
-        redirect_uri=REDIRECT_URI,
-        response_type="code",
-        grant_type="authorization_code"
-    )
-    auth_url = app.generate_authcode()
-    print("\n[INFO] Login here and get the auth code:")
-    print(auth_url)
-    auth_code = input("\nPaste the auth code: ")
-    app.set_token(auth_code)
-    token_response = app.generate_token()
-    access_token = token_response["access_token"]
-    with open(ACCESS_TOKEN_PATH, 'w') as f:
-        f.write(access_token)
-    return access_token
-
-# Load or generate token
-def load_access_token():
-    try:
-        return st.secrets["FYERS"]["ACCESS_TOKEN"]
-    except KeyError:
-        st.error("Access token not found in Streamlit secrets. Please add it to the secrets configuration.")
-        raise RuntimeError("Access token not available on Streamlit Cloud. Generate it locally first.")
-
-# Place order using Fyers API
+# ✅ Place order using Fyers API
 def place_order(fyers, symbol, side, qty=1):
     order = {
         "symbol": symbol,
@@ -58,12 +27,11 @@ def place_order(fyers, symbol, side, qty=1):
     print("\n[TRADE EXECUTED]", side, symbol, "| Response:", response)
     return response
 
-# Execute trading strategy
+# ✅ Run the AI trading bot
 def run_trading_bot(signals_df, live=True):
-    access_token = load_access_token()
     fyers = fyersModel.FyersModel(
         client_id=APP_ID,
-        token=f"{APP_ID}:{access_token}",
+        token=f"{APP_ID}:{ACCESS_TOKEN}",
         log_path="logs"
     )
     for _, row in signals_df.iterrows():
@@ -74,7 +42,7 @@ def run_trading_bot(signals_df, live=True):
                 place_order(fyers, symbol, action, qty=1)
             log_trade(symbol, action)
 
-# Log executed trades
+# ✅ Log trade history
 def log_trade(symbol, action):
     with open("trade_log.csv", "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action}\n")
