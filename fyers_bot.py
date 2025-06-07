@@ -14,6 +14,13 @@ APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
 REDIRECT_URI = st.secrets["FYERS"]["FYERS_REDIRECT_URI"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 
+# Initialize Fyers model
+fyers = fyersModel.FyersModel(
+    client_id=APP_ID,
+    token=f"{APP_ID}:{ACCESS_TOKEN}",
+    log_path="logs/"
+)
+
 # Get live market price
 @st.cache_data(ttl=60)
 def get_live_price(symbol):
@@ -28,38 +35,37 @@ def get_live_price(symbol):
         return 0
 
 # Place order using Fyers API
-def place_order(fyers, symbol, side, qty):
-    order = {
-        "symbol": symbol,
-        "qty": qty,
-        "type": 2,  # MARKET
-        "side": 1 if side == "BUY" else -1,
-        "productType": "INTRADAY",
-        "limitPrice": 0,
-        "stopPrice": 0,
-        "validity": "DAY",
-        "disclosedQty": 0,
-        "offlineOrder": False,
-        "orderType": 1
-    }
-    response = fyers.place_order(order)
-    print("[TRADE EXECUTED]", side, symbol, "| Qty:", qty, "| Response:", response)
-    return response
+def place_order(symbol, side, qty):
+    try:
+        order = {
+            "symbol": symbol,
+            "qty": qty,
+            "type": 2,  # MARKET
+            "side": 1 if side == "BUY" else -1,
+            "productType": "INTRADAY",
+            "limitPrice": 0,
+            "stopPrice": 0,
+            "validity": "DAY",
+            "disclosedQty": 0,
+            "offlineOrder": False,
+            "orderType": 1
+        }
+        response = fyers.place_order(order)
+        print("[TRADE EXECUTED]", side, symbol, "| Qty:", qty, "| Response:", response)
+        return response
+    except Exception as e:
+        print("[ORDER FAILED]", symbol, side, qty, "Error:", e)
+        return {}
 
 # Log executed trades
 def log_trade(symbol, action, qty, entry_price, tp_price, sl_price):
     os.makedirs("logs", exist_ok=True)
+    log_line = f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action},{qty},{entry_price},{tp_price},{sl_price}\n"
     with open("trade_log.csv", "a") as f:
-        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action},{qty},{entry_price},{tp_price},{sl_price}\n")
+        f.write(log_line)
 
 # Main trading function
 def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2, sl_percent=1):
-    fyers = fyersModel.FyersModel(
-        client_id=APP_ID,
-        token=f"{APP_ID}:{ACCESS_TOKEN}",
-        log_path="logs/"
-    )
-
     for _, row in signals_df.iterrows():
         symbol = row['symbol']
         action = row['signal']
@@ -74,17 +80,28 @@ def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2
             sl_price = round(price * (1 - sl_percent / 100), 2) if action == "BUY" else round(price * (1 + sl_percent / 100), 2)
 
             if live:
-                place_order(fyers, symbol, action, qty)
+                place_order(symbol, action, qty)
 
-            # ✅ LOG THE TRADE
             log_trade(symbol, action, qty, price, tp_price, sl_price)
-def get_fyers_positions(fyers):
+
+# Get current positions
+def get_fyers_positions():
     try:
         positions = fyers.positions()
         return positions.get("netPositions", [])
     except Exception as e:
         print("[ERROR] Failed to fetch positions:", e)
         return []
+
+# Get available funds
+def get_fyers_funds():
+    try:
+        funds = fyers.funds()
+        return funds.get("fundLimit", {})
+    except Exception as e:
+        print("[ERROR] Failed to fetch funds:", e)
+        return {}
+
 # Send daily summary email
 def send_trade_summary_email():
     email_from = st.secrets["EMAIL"]["EMAIL_FROM"]
@@ -102,7 +119,7 @@ def send_trade_summary_email():
         print("[EMAIL] No trade entries to report.")
         return
 
-    latest_trades = trades[-10:]  # last 10 or less
+    latest_trades = trades[-10:]
     summary_html = "<br>".join([f"<b>{line.strip()}</b>" for line in latest_trades])
 
     msg = MIMEMultipart()
