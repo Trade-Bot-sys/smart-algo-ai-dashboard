@@ -7,12 +7,17 @@ import os
 import time
 import requests
 from fyers_apiv3 import fyersModel
+import schedule
+import threading
+import matplotlib.pyplot as plt
 
 # Load credentials securely from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
 REDIRECT_URI = st.secrets["FYERS"]["FYERS_REDIRECT_URI"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
+TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
 
 # Initialize Fyers model
 fyers = fyersModel.FyersModel(
@@ -40,7 +45,7 @@ def place_order(symbol, side, qty):
         order = {
             "symbol": symbol,
             "qty": qty,
-            "type": 2,  # MARKET
+            "type": 2,
             "side": 1 if side == "BUY" else -1,
             "productType": "INTRADAY",
             "limitPrice": 0,
@@ -83,6 +88,7 @@ def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2
                 place_order(symbol, action, qty)
 
             log_trade(symbol, action, qty, price, tp_price, sl_price)
+            send_telegram_alert(symbol, action, price, tp_price, sl_price)
 
 # Get current positions
 def get_fyers_positions():
@@ -123,14 +129,14 @@ def send_trade_summary_email():
     summary_html = "<br>".join([f"<b>{line.strip()}</b>" for line in latest_trades])
 
     msg = MIMEMultipart()
-    msg["Subject"] = "📊 Daily AI Trade Summary"
+    msg["Subject"] = "\U0001F4CA Daily AI Trade Summary"
     msg["From"] = email_from
     msg["To"] = email_to
 
     body = f"""
     <html>
     <body>
-    <h2>📈 AI Trading Summary - {pd.Timestamp.now().strftime('%Y-%m-%d')}</h2>
+    <h2>\U0001F4C8 AI Trading Summary - {pd.Timestamp.now().strftime('%Y-%m-%d')}</h2>
     {summary_html}
     </body>
     </html>
@@ -145,3 +151,45 @@ def send_trade_summary_email():
         print("[EMAIL SENT] Daily trade summary email sent successfully.")
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send summary email: {e}")
+
+# Send Telegram alerts
+def send_telegram_alert(symbol, action, price, tp, sl):
+    try:
+        msg = f"\U0001F6A8 {action} Alert for {symbol}\nPrice: {price}\nTP: {tp}, SL: {sl}"
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": msg}
+        requests.post(url, data=payload)
+    except Exception as e:
+        print("[TELEGRAM ERROR]", e)
+
+# Schedule daily job at 9:15 AM IST
+def start_scheduler():
+    schedule.every().day.at("09:15").do(lambda: run_trading_bot(pd.read_csv("signals.csv")))
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+# Start auto-run scheduler in background
+def start_trading_bot():
+    threading.Thread(target=start_scheduler, daemon=True).start()
+
+# Profit/loss graph for trades
+def plot_trade_history():
+    if not os.path.exists("trade_log.csv"):
+        st.info("No trade history found.")
+        return
+    df = pd.read_csv("trade_log.csv", header=None,
+                     names=["Date", "Symbol", "Action", "Qty", "Entry", "TP", "SL"])
+    df["PnL"] = df.apply(lambda x: (x["TP"] - x["Entry"]) * x["Qty"] if x["Action"] == "BUY" else (x["Entry"] - x["TP"]) * x["Qty"], axis=1)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values("Date")
+    df["CumulativePnL"] = df["PnL"].cumsum()
+    st.line_chart(df.set_index("Date")["CumulativePnL"])
+
+# Launch dashboard
+def main_dashboard():
+    st.title("\U0001F680 Smart AI Trading Dashboard")
+    plot_trade_history()
+
+start_trading_bot()
+main_dashboard()
