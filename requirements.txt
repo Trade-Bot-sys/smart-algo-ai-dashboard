@@ -2,4 +2,4 @@ streamlit
 yfinance
 plotly
 pandas
-fyers-apiv3==2.0.5
+fyers-apiv3==3.1.7
