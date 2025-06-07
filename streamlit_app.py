@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
+from fyers_apiv3.FyersModel import accessToken
 from fyers_bot import (
     run_trading_bot,
     get_fyers_positions,
@@ -29,6 +30,36 @@ EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
+
+# ✅ Generate or load access token
+@st.cache_data(ttl=3600)
+def generate_access_token():
+    session = accessToken.SessionModel(
+        client_id=APP_ID,
+        secret_key=APP_SECRET,
+        redirect_uri=REDIRECT_URI,
+        response_type="code",
+        grant_type="authorization_code"
+    )
+    session.set_token(st.secrets["FYERS"]["AUTH_CODE"])
+    response = session.generate_token()
+    access_token = response["access_token"]
+    with open("access_token.txt", "w") as f:
+        f.write(access_token)
+    return access_token
+
+if os.path.exists("access_token.txt"):
+    with open("access_token.txt") as f:
+        ACCESS_TOKEN = f.read().strip()
+else:
+    ACCESS_TOKEN = generate_access_token()
+
+# ✅ Setup Fyers session
+fyers = fyersModel.FyersModel(
+    client_id=APP_ID,
+    token=f"{APP_ID}:{ACCESS_TOKEN}",
+    log_path="logs/"
+)
 
 # ✅ Setup Fyers session
 fyers = fyersModel.FyersModel(
