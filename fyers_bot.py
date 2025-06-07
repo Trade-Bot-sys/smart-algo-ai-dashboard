@@ -143,12 +143,14 @@ def run_trading_bot(live=True, capital_per_trade=1000, tp_percent=2, sl_percent=
             continue
 
         price = get_live_price(symbol)
-        if price <= 0: continue
+        if price <= 0:
+            continue
+
         qty = max(int(capital_per_trade // price), 1)
         total_cost = qty * price
 
         if live and total_cost > available_cash:
-            print(f"⛔ Skipping {symbol}: Insufficient funds.")
+            print(f"⛔ Skipping {symbol}: Not enough funds.")
             continue
 
         tp_price = round(price * (1 + tp_percent / 100), 2)
