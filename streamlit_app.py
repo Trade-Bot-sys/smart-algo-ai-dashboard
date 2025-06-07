@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from fyers_bot import run_trading_bot, get_fyers_positions, get_fyers_funds
 from fyers_apiv3 import fyersModel
+from googlesearch import search
 
 # Load credentials
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
@@ -20,6 +21,28 @@ fyers = fyersModel.FyersModel(
     token=f"{APP_ID}:{ACCESS_TOKEN}",
     log_path="logs/"
 )
+
+# Load Nifty 500 list
+try:
+    nifty_df = pd.read_csv("data/nifty500list.csv")
+    STOCK_LIST = [f"{symbol}.NS" for symbol in nifty_df["Symbol"].dropna()]
+except:
+    STOCK_LIST = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
+
+# Function to fetch relevant news sentiment
+def news_sentiment_score(symbol):
+    query = f"{symbol} stock news site:moneycontrol.com OR site:economictimes.indiatimes.com"
+    results = list(search(query, num_results=5))
+    return len(results)
+
+# Select top 5 stocks based on news hits
+def select_stocks_by_news():
+    scores = []
+    for sym in STOCK_LIST[:50]:  # Limit to top 50 for speed
+        count = news_sentiment_score(sym.replace(".NS", ""))
+        scores.append((sym, count))
+    top = sorted(scores, key=lambda x: x[1], reverse=True)[:5]
+    return [s[0] for s in top]
 
 # Setup logs
 os.makedirs("logs", exist_ok=True)
@@ -35,19 +58,17 @@ capital = st.number_input("Capital per trade (₹)", value=1000)
 tp = st.slider("Take Profit %", 1, 10, value=2)
 sl = st.slider("Stop Loss %", 1, 10, value=1)
 
-# Stock selection
-stocks = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
-symbol = st.selectbox("Choose Stock:", stocks)
+# Recommended Stocks
+recommended = select_stocks_by_news()
+symbol = st.selectbox("📌 Choose Stock (from Nifty 500 with news buzz)", recommended)
 
-# Load data and generate dummy signal
+# Load data
 data = yf.download(symbol, period="3mo", interval="1d")
 data['Signal'] = ["HOLD"] * len(data)
-data.loc[data.index[-1], 'Signal'] = "BUY"  # Dummy signal for testing
+data.loc[data.index[-1], 'Signal'] = "BUY"
 
-# Show Signal
-st.write("## Signal: ", data['Signal'].iloc[-1])
+st.write("## Signal:", data['Signal'].iloc[-1])
 
-# Plot chart
 fig = go.Figure()
 fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'],
                     low=data['Low'], close=data['Close'])
@@ -55,36 +76,33 @@ last_price = data['Close'].iloc[-1]
 if data['Signal'].iloc[-1] == "BUY":
     fig.add_trace(go.Scatter(x=[data.index[-1]], y=[last_price], mode="markers",
                              marker=dict(color="green", size=12), name="BUY"))
-elif data['Signal'].iloc[-1] == "SELL":
-    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[last_price], mode="markers",
-                             marker=dict(color="red", size=12), name="SELL"))
 st.plotly_chart(fig)
 
-# Run trade
 if st.button("Run AI Trade Now"):
     signal_df = pd.DataFrame([{"symbol": symbol, "signal": data['Signal'].iloc[-1]}])
     run_trading_bot(signal_df, live=live_mode, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
-    st.success("Trade processed in " + ("Live" if live_mode else "Simulation") + " mode!")
+    st.success("✅ Trade processed in " + ("Live" if live_mode else "Simulation") + " mode!")
 
-# Show live positions
-st.header("📦 Current Positions (Fyers)")
-positions = get_fyers_positions(fyers)
+# Current Positions
+st.header("📦 Portfolio (Fyers)")
+positions = get_fyers_positions()
 if positions:
     df_positions = pd.DataFrame(positions)
-    st.dataframe(df_positions[["symbol", "netQty", "avgPrice", "pnl"]])
+    df_positions["PnL_₹"] = df_positions["netQty"] * (df_positions["ltp"] - df_positions["avgPrice"])
+    st.dataframe(df_positions[["symbol", "netQty", "avgPrice", "ltp", "PnL_₹"]])
 else:
     st.info("No open positions.")
 
-# Show available funds
-st.header("💰 Available Funds (Fyers)")
-funds = get_fyers_funds(fyers)
+# Available Funds
+st.header("💰 Funds Available (Fyers)")
+funds = get_fyers_funds()
 if funds:
     df_funds = pd.DataFrame(funds)
     st.dataframe(df_funds[["title", "equityAmount", "collateralAmount", "net"]])
 else:
     st.info("Could not fetch funds.")
 
-# Email summary sender
+# Email Summary
 def send_trade_summary_email():
     if os.path.exists("trade_log.csv"):
         try:
@@ -97,10 +115,10 @@ def send_trade_summary_email():
         except Exception as e:
             body = f"Error reading trade log: {e}"
     else:
-        body = "Trade log file not found."
+        body = "Trade log not found."
 
     msg = EmailMessage()
-    msg['Subject'] = '📈 Daily Trade Summary - Smart AI Bot'
+    msg['Subject'] = '📈 Daily AI Trade Summary'
     msg['From'] = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
     msg['To'] = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
     msg.set_content(body)
@@ -109,20 +127,17 @@ def send_trade_summary_email():
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(st.secrets["EMAIL"]["EMAIL_ADDRESS"], st.secrets["EMAIL"]["EMAIL_PASSWORD"])
             smtp.send_message(msg)
-            print("✅ Daily trade summary email sent.")
+        print("✅ Email sent.")
     except Exception as e:
-        print("❌ Email send failed:", e)
+        print("❌ Email error:", e)
 
 if "scheduler_started" not in st.session_state:
     scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
     scheduler.add_job(send_trade_summary_email, "cron", hour=16, minute=30)
     scheduler.start()
     st.session_state.scheduler_started = True
-    st.toast("📧 Daily summary email scheduled at 4:30 PM IST!")
+    st.toast("📧 Email scheduled at 4:30 PM IST")
 
-st.info("📅 Email scheduler active. Summary will be sent at 4:30 PM IST.")
-# Test manual summary send
 if st.button("Send Daily Trade Summary Now"):
     send_trade_summary_email()
-    st.success("Daily trade summary email sent.")
-    
+    st.success("✅ Summary email sent.")
