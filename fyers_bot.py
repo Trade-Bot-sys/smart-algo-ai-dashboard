@@ -1,8 +1,9 @@
 import os
 import time
 import pandas as pd
-from fyers_api.fyers_app import FyersApp  # ✅ Updated import
-from fyers_api import fyersModel          # ✅ Updated import for placing orders
+from fyers_apiv3.FyersApp import 
+FyersApp
+from fyers_apiv3 import fyersModel      # ✅ Updated import for placing orders
 
 APP_ID = os.getenv("FYERS_APP_ID")
 APP_SECRET = os.getenv("FYERS_APP_SECRET")
