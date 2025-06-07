@@ -184,7 +184,6 @@ def start_scheduler():
     threading.Thread(target=lambda: [schedule.run_pending() or time.sleep(60)], daemon=True).start()
 
 def render_dashboard():
-    st.set_page_config(layout="wide")
     st.title("📊 Smart AI Trading Dashboard")
     
     # Portfolio Positions
