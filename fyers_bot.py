@@ -1,8 +1,8 @@
-
 import os
 import time
 import pandas as pd
 from fyers_apiv3 import fyersModel
+from fyers_apiv3.FyersApp import SessionModel  # ✅ Correct import
 
 APP_ID = os.getenv("FYERS_APP_ID")
 APP_SECRET = os.getenv("FYERS_APP_SECRET")
@@ -10,8 +10,12 @@ REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
 ACCESS_TOKEN_PATH = "access_token.txt"
 
 def generate_access_token():
-    from fyers_apiv3 import accessToken
-    session = accessToken.SessionModel(client_id=APP_ID, secret_key=APP_SECRET, redirect_uri=REDIRECT_URI, response_type="code")
+    session = SessionModel(
+        client_id=APP_ID,
+        secret_key=APP_SECRET,
+        redirect_uri=REDIRECT_URI,
+        response_type="code"
+    )
     print("\n[INFO] Go to this URL and login:")
     print(session.generate_authcode())
     auth_code = input("\nPaste the auth code here: ")
