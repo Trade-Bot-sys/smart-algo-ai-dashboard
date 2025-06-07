@@ -2,7 +2,7 @@ import os
 import time
 import pandas as pd
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.accessToken import SessionModel  # ✅ Correct import
+from fyers_apiv3.FyersApp import SessionModel  # ✅ Correct import
 
 # Environment variables
 APP_ID = os.getenv("FYERS_APP_ID")
@@ -60,7 +60,7 @@ def run_trading_bot(signals_df, live=True):
     access_token = load_access_token()
     fyers = fyersModel.FyersModel(
         client_id=APP_ID,
-        token=f"{APP_ID}:{access_token}",  # Important for v3
+        token=f"{APP_ID}:{access_token}",  # ✅ Required format for v3
         log_path="logs"
     )
     for _, row in signals_df.iterrows():
