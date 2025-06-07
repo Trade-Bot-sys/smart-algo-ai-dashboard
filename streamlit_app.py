@@ -87,10 +87,15 @@ else:
 # Email summary sender
 def send_trade_summary_email():
     if os.path.exists("trade_log.csv"):
-        df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
-        today = datetime.now().strftime("%Y-%m-%d")
-        daily = df[df["timestamp"].str.contains(today)]
-        body = daily.to_string(index=False) if not daily.empty else "No trades executed today."
+        try:
+            df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+            df = df.dropna(subset=["timestamp"])
+            today = pd.Timestamp.now().normalize()
+            daily = df[df["timestamp"].dt.normalize() == today]
+            body = daily.to_string(index=False) if not daily.empty else "No trades executed today."
+        except Exception as e:
+            body = f"Error reading trade log: {e}"
     else:
         body = "Trade log file not found."
 
@@ -108,14 +113,16 @@ def send_trade_summary_email():
     except Exception as e:
         print("❌ Email send failed:", e)
 
-# Test manual summary send
-if st.button("Send Daily Trade Summary Now"):
-    send_trade_summary_email()
-    st.success("Daily trade summary email sent.")
-
-# Scheduler setup (runs only once)
 if "scheduler_started" not in st.session_state:
     scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
     scheduler.add_job(send_trade_summary_email, "cron", hour=16, minute=30)
     scheduler.start()
     st.session_state.scheduler_started = True
+    st.toast("📧 Daily summary email scheduled at 4:30 PM IST!")
+
+st.info("📅 Email scheduler active. Summary will be sent at 4:30 PM IST.")
+# Test manual summary send
+if st.button("Send Daily Trade Summary Now"):
+    send_trade_summary_email()
+    st.success("Daily trade summary email sent.")
+    
