@@ -1,4 +1,4 @@
-
+os.makedirs("logs", exist_ok=True)
 import streamlit as st
 import pandas as pd
 import yfinance as yf
