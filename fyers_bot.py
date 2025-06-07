@@ -2,7 +2,11 @@ import os
 import time
 import pandas as pd
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.FyersApp import SessionModel  # ✅ Correct import
+import importlib
+
+# ✅ Dynamically import SessionModel to avoid import errors on Streamlit Cloud
+fyers_app_module = importlib.import_module("fyers_apiv3.FyersApp")
+SessionModel = getattr(fyers_app_module, "SessionModel")
 
 APP_ID = os.getenv("FYERS_APP_ID")
 APP_SECRET = os.getenv("FYERS_APP_SECRET")
