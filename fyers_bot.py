@@ -187,17 +187,36 @@ def start_trading_bot():
     threading.Thread(target=start_scheduler, daemon=True).start()
 
 # Profit/loss graph for trades
+# Profit/loss graph for trades
 def plot_trade_history():
     if not os.path.exists("trade_log.csv"):
         st.info("No trade history found.")
         return
-    df = pd.read_csv("trade_log.csv", header=None,
-                     names=["Date", "Symbol", "Action", "Qty", "Entry", "TP", "SL"])
-    df["PnL"] = df.apply(lambda x: (x["TP"] - x["Entry"]) * x["Qty"] if x["Action"] == "BUY" else (x["Entry"] - x["TP"]) * x["Qty"], axis=1)
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df.sort_values("Date")
-    df["CumulativePnL"] = df["PnL"].cumsum()
-    st.line_chart(df.set_index("Date")["CumulativePnL"])
+
+    try:
+        # Read CSV normally with header row
+        df = pd.read_csv("trade_log.csv")
+
+        # Ensure correct column names
+        if "timestamp" in df.columns:
+            df.rename(columns={"timestamp": "Date"}, inplace=True)
+
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df.dropna(subset=["Date"])
+
+        df["PnL"] = df.apply(
+            lambda x: (x["tp_price"] - x["entry_price"]) * x["qty"] if x["action"] == "BUY"
+            else (x["entry_price"] - x["tp_price"]) * x["qty"],
+            axis=1
+        )
+
+        df = df.sort_values("Date")
+        df["CumulativePnL"] = df["PnL"].cumsum()
+
+        st.line_chart(df.set_index("Date")["CumulativePnL"])
+
+    except Exception as e:
+        st.error(f"Error plotting trade history: {e}")
 
 # Launch dashboard
 def main_dashboard():
