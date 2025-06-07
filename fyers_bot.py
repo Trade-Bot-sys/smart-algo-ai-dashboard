@@ -57,14 +57,6 @@ def place_order(symbol, side, qty):
         print(f"[ORDER FAIL] {symbol}: {e}")
         return {}
 
-from fyers_apiv3 import fyersModel
-
-fyers = fyersModel.FyersModel(
-    client_id=APP_ID,
-    token=f"{APP_ID}:{ACCESS_TOKEN}",
-    log_path="logs/"
-)
-
 def get_fyers_positions():
     try:
         positions = fyers.positions()
