@@ -112,6 +112,7 @@ def get_fyers_funds():
         return {}
 
 # Send daily summary email
+# Send daily summary email
 def send_trade_summary_email():
     email_from = st.secrets["EMAIL"]["EMAIL_FROM"]
     email_to = st.secrets["EMAIL"]["EMAIL_TO"]
@@ -121,25 +122,34 @@ def send_trade_summary_email():
         print("[EMAIL] No trade log file found.")
         return
 
-    with open("trade_log.csv", "r") as f:
-        trades = f.readlines()
-
-    if not trades:
-        print("[EMAIL] No trade entries to report.")
+    try:
+        df = pd.read_csv("trade_log.csv", header=None,
+                         names=["timestamp", "symbol", "action", "qty", "entry_price", "tp_price", "sl_price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+    except Exception as e:
+        print("[EMAIL] Failed to parse trade log:", e)
         return
 
-    latest_trades = trades[-10:]
-    summary_html = "<br>".join([f"<b>{line.strip()}</b>" for line in latest_trades])
+    if df.empty:
+        print("[EMAIL] No valid trades to report.")
+        return
+
+    latest_trades = df.tail(10)
+    summary_html = "<br>".join([
+        f"<b>{row['timestamp']} | {row['symbol']} | {row['action']} | Qty: {row['qty']} | Entry: {row['entry_price']} | TP: {row['tp_price']} | SL: {row['sl_price']}</b>"
+        for _, row in latest_trades.iterrows()
+    ])
 
     msg = MIMEMultipart()
-    msg["Subject"] = "\U0001F4CA Daily AI Trade Summary"
+    msg["Subject"] = "📊 Daily AI Trade Summary"
     msg["From"] = email_from
     msg["To"] = email_to
 
     body = f"""
     <html>
     <body>
-    <h2>\U0001F4C8 AI Trading Summary - {pd.Timestamp.now().strftime('%Y-%m-%d')}</h2>
+    <h2>📈 AI Trading Summary - {pd.Timestamp.now().strftime('%Y-%m-%d')}</h2>
     {summary_html}
     </body>
     </html>
