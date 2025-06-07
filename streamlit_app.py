@@ -20,6 +20,7 @@ from fyers_bot import (
 
 # other imports...
 st.set_page_config(layout="wide", page_title="Smart AI Trading Dashboard")
+st.title("📈 Smart AI Trading Dashboard")
 
 # ✅ Load Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
