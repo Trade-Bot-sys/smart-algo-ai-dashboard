@@ -150,29 +150,50 @@ if os.path.exists("trade_log.csv"):
     df = df.sort_values("timestamp")
     df["CumulativePnL"] = df["PnL"].cumsum()
     st.line_chart(df.set_index("timestamp")["CumulativePnL"])
-    
+    stock_options = df_log["symbol"].dropna().unique().tolist()
+    selected_stock = st.selectbox("Select Stock", stock_options, index=0 if stock_options else None)
+
+if selected_stock:
+    try:
+        hist_data = yf.download(selected_stock, period="2mo", interval="1d")
+        if not hist_data.empty:
+            fig2 = go.Figure()
+            fig2.add_candlestick(
+                x=hist_data.index,
+                open=hist_data["Open"],
+                high=hist_data["High"],
+                low=hist_data["Low"],
+                close=hist_data["Close"]
+            )
+            
+            # Plot past trades for this stock
+            stock_trades = df_log[df_log["symbol"] == selected_stock]
+            for _, row in stock_trades.iterrows():
+                color = "green" if row["action"] == "BUY" else "red"
+                label = row["action"].capitalize()
+                fig2.add_trace(go.Scatter(
+                    x=[row["timestamp"]],
+                    y=[row["entry"]],
+                    mode="markers+text",
+                    marker=dict(color=color, size=10),
+                    name=label,
+                    text=[label],
+                    textposition="top center" if row["action"] == "BUY" else "bottom center"
+                ))
+            st.subheader(f"📈 Trade Log Chart - {selected_stock}")
+            st.plotly_chart(fig2)
+        else:
+            st.warning("⚠️ No historical data found for selected stock.")
+    except Exception as e:
+        st.error(f"⚠️ Error loading chart: {e}")
+
 # ✅ Live Trade Chart Per Stock with Dropdown
 st.header("📌 Trade History by Stock")
 if os.path.exists("trade_log.csv"):
     df_log = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
     df_log["timestamp"] = pd.to_datetime(df_log["timestamp"], errors="coerce")
     df_log = df_log.dropna()
-    stock_options = df_log["symbol"].unique().tolist()
-    selected_stock = st.selectbox("Select Stock", stock_options)
     
-    df_stock = df_log[df_log["symbol"] == selected_stock]
-    hist_data = yf.download(selected_stock, period="2mo", interval="1d")
-    fig2 = go.Figure()
-    fig2.add_candlestick(x=hist_data.index, open=hist_data["Open"], high=hist_data["High"],
-                         low=hist_data["Low"], close=hist_data["Close"])
-
-    for i, row in df_stock.iterrows():
-        color = "green" if row["action"] == "BUY" else "red"
-        label = "Buy" if row["action"] == "BUY" else "Sell"
-        fig2.add_trace(go.Scatter(x=[row["timestamp"]], y=[row["entry"]],
-                                  mode="markers+text", marker=dict(color=color, size=10),
-                                  name=label, text=[label], textposition="top center"))
-    st.plotly_chart(fig2)
     
 # ✅ Telegram Test
 if st.button("🔔 Test Telegram Alert"):
