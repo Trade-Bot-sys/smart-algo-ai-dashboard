@@ -18,6 +18,13 @@ from fyers_bot import (
     send_trade_summary_email
 )
 
+# other imports...
+
+st.set_page_config(layout="wide")  # ← MUST BE FIRST
+
+# Then continue with the rest
+st.title("📈 Smart AI Trading Dashboard")
+
 # ✅ Load Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
@@ -79,8 +86,6 @@ def get_strategy_signal(symbol):
         return "HOLD"
 
 # ✅ UI: Smart Dashboard
-st.set_page_config(layout="wide")
-st.title("📈 Smart AI Trading Dashboard with Live News, Signals, and Auto Trade")
 
 # Inputs
 capital = st.number_input("Capital per Trade (₹)", value=1000)
