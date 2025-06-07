@@ -88,7 +88,7 @@ if st.button("🚀 Run AI Trade Now"):
 
 # Live positions
 st.header("📦 Portfolio (Fyers)")
-positions = get_fyers_positions(fyers)
+positions = get_fyers_positions()
 if positions:
     df_positions = pd.DataFrame(positions)
     df_positions["PnL ₹"] = df_positions["netQty"] * (df_positions["ltp"] - df_positions["avgPrice"])
@@ -98,7 +98,7 @@ else:
 
 # Available funds
 st.header("💰 Funds (Fyers)")
-funds = get_fyers_funds(fyers)
+funds = get_fyers_funds()
 if funds:
     df_funds = pd.DataFrame(funds)
     st.dataframe(df_funds[["title", "equityAmount", "collateralAmount", "net"]])
