@@ -2,8 +2,8 @@
 
 import os
 import smtplib
-from email.message import EmailMessage
 import streamlit as st
+from email.message import EmailMessage
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
