@@ -1,3 +1,53 @@
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import pandas as pd
+import streamlit as st
+import os
+
+def send_trade_summary_email():
+    email_from = st.secrets["EMAIL"]["EMAIL_FROM"]
+    email_to = st.secrets["EMAIL"]["EMAIL_TO"]
+    email_password = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
+
+    if not os.path.exists("trade_log.csv"):
+        print("[EMAIL] No trade log file found.")
+        return
+
+    with open("trade_log.csv", "r") as f:
+        trades = f.readlines()
+
+    if not trades:
+        print("[EMAIL] No trade entries to report.")
+        return
+
+    latest_trades = trades[-10:]
+    summary_html = "<br>".join([f"<b>{line.strip()}</b>" for line in latest_trades])
+
+    msg = MIMEMultipart()
+    msg["Subject"] = "📊 Daily AI Trade Summary"
+    msg["From"] = email_from
+    msg["To"] = email_to
+
+    body = f"""
+    <html>
+    <body>
+    <h2>📈 AI Trading Summary - {pd.Timestamp.now().strftime('%Y-%m-%d')}</h2>
+    {summary_html}
+    </body>
+    </html>
+    """
+    msg.attach(MIMEText(body, "html"))
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(email_from, email_password)
+            server.send_message(msg)
+        print("[EMAIL SENT] Daily trade summary email sent successfully.")
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send summary email: {e}")
+
 import os import time import pandas as pd import streamlit as st from fyers_apiv3 import fyersModel from fyers_apiv3 import accessToken import requests
 
 Load credentials securely from Streamlit secrets
