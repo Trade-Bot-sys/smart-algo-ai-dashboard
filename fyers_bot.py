@@ -194,25 +194,34 @@ def plot_trade_history():
         return
 
     try:
-        # Read CSV normally with header row
         df = pd.read_csv("trade_log.csv")
 
-        # Ensure correct column names
+        # Rename timestamp to Date if exists
         if "timestamp" in df.columns:
             df.rename(columns={"timestamp": "Date"}, inplace=True)
 
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         df = df.dropna(subset=["Date"])
 
+        # Ensure required columns exist
+        required_cols = {"entry_price", "tp_price", "qty", "action"}
+        if not required_cols.issubset(df.columns):
+            st.error(f"Missing required columns in trade_log.csv: {required_cols - set(df.columns)}")
+            return
+
+        # Calculate PnL
         df["PnL"] = df.apply(
-            lambda x: (x["tp_price"] - x["entry_price"]) * x["qty"] if x["action"] == "BUY"
-            else (x["entry_price"] - x["tp_price"]) * x["qty"],
+            lambda x: (x["tp_price"] - x["entry_price"]) * x["qty"]
+            if x["action"] == "BUY" else
+            (x["entry_price"] - x["tp_price"]) * x["qty"],
             axis=1
         )
 
+        # Cumulative PnL chart
         df = df.sort_values("Date")
         df["CumulativePnL"] = df["PnL"].cumsum()
 
+        st.subheader("📈 Trade History - Cumulative PnL")
         st.line_chart(df.set_index("Date")["CumulativePnL"])
 
     except Exception as e:
