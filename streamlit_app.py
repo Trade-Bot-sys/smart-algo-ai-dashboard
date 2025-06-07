@@ -8,13 +8,15 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
-from fyers_bot import run_trading_bot, get_fyers_positions, get_fyers_funds
+from fyers_bot import run_trading_bot, get_fyers_positions, get_fyers_funds, send_telegram_alert
 
 # Load secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
+TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
 
 # Fyers session
 fyers = fyersModel.FyersModel(
@@ -48,43 +50,67 @@ def get_top_news_stocks():
     sorted_stocks = sorted(results, key=lambda x: x[1], reverse=True)
     return [s[0] for s in sorted_stocks[:5]]
 
+# Signal analysis
+@st.cache_data(ttl=3600)
+def get_strategy_signal(symbol):
+    try:
+        df = yf.download(symbol, period="15d", interval="1h")
+        if len(df) < 30:
+            return "HOLD"
+        df["EMA20"] = df["Close"].ewm(span=20).mean()
+        df["EMA50"] = df["Close"].ewm(span=50).mean()
+        df["VolumeAvg"] = df["Volume"].rolling(window=20).mean()
+        df["MACD"] = df["Close"].ewm(span=12).mean() - df["Close"].ewm(span=26).mean()
+
+        ema_signal = df["EMA20"].iloc[-1] > df["EMA50"].iloc[-1]
+        volume_signal = df["Volume"].iloc[-1] > 1.2 * df["VolumeAvg"].iloc[-1]
+        macd_signal = df["MACD"].iloc[-1] > 0
+
+        if ema_signal and volume_signal and macd_signal:
+            return "BUY"
+        return "HOLD"
+    except:
+        return "HOLD"
+
 # 📊 UI Start
 st.title("📈 Smart AI Trading Dashboard with Live News & Strategy")
-
-# Trading mode
-mode = st.radio("Select Mode", ["Simulation", "Live Trading"], index=0)
-live_mode = (mode == "Live Trading")
 
 # Trade params
 capital = st.number_input("Capital per Trade (₹)", value=1000)
 tp = st.slider("Take Profit %", 1, 10, value=2)
 sl = st.slider("Stop Loss %", 1, 10, value=1)
 
-# Stock suggestion from news
+# Display signal stock from news
 top_stocks = get_top_news_stocks()
-symbol = st.selectbox("🔥 Trending Stock by News Sentiment", top_stocks)
-
-# Signal & chart
+symbol = top_stocks[0] if top_stocks else "RELIANCE.NS"
 data = yf.download(symbol, period="3mo", interval="1d")
+signal = get_strategy_signal(symbol)
 data['Signal'] = ["HOLD"] * len(data)
-data.loc[data.index[-1], 'Signal'] = "BUY"
+data.loc[data.index[-1], 'Signal'] = signal
 
-st.subheader(f"📍 Signal for {symbol}: {data['Signal'].iloc[-1]}")
+st.subheader(f"📍 Signal for {symbol}: {signal}")
 fig = go.Figure()
-fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'],
-                    low=data['Low'], close=data['Close'])
+fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])
 last_price = data['Close'].iloc[-1]
-if data['Signal'].iloc[-1] == "BUY":
-    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[last_price],
-                             mode="markers", marker=dict(color="green", size=12),
-                             name="BUY Signal"))
+if signal == "BUY":
+    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[last_price], mode="markers", marker=dict(color="green", size=12), name="BUY Signal"))
 st.plotly_chart(fig)
 
-# Execute trade
-if st.button("🚀 Run AI Trade Now"):
-    signal_df = pd.DataFrame([{"symbol": symbol, "signal": data['Signal'].iloc[-1]}])
-    run_trading_bot(signal_df, live=live_mode, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
-    st.success(f"Trade executed in {'Live' if live_mode else 'Simulation'} mode!")
+# Auto run trade at 9:15 AM with stop loss and take profit
+if "scheduler_started" not in st.session_state:
+    def auto_trade():
+        signal_df = pd.DataFrame([{"symbol": symbol, "signal": get_strategy_signal(symbol)}])
+        run_trading_bot(signal_df, live=True, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
+
+    def auto_summary():
+        send_trade_summary_email()
+
+    scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+    scheduler.add_job(auto_trade, "cron", hour=9, minute=15)
+    scheduler.add_job(auto_summary, "cron", hour=16, minute=30)
+    scheduler.start()
+    st.session_state.scheduler_started = True
+    st.toast("✅ Trade & Summary Scheduler Set: 9:15 AM & 4:30 PM IST")
 
 # Live positions
 st.header("📦 Portfolio (Fyers)")
@@ -105,42 +131,26 @@ if funds:
 else:
     st.warning("Unable to fetch fund details.")
 
-# Trade summary email
-def send_trade_summary_email():
-    if not os.path.exists("trade_log.csv"):
-        return "Trade log not found."
-
+# Trade summary chart
+st.subheader("📈 Cumulative PnL Chart")
+if os.path.exists("trade_log.csv"):
     try:
-        df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
-        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-        df = df.dropna()
-        today = pd.Timestamp.now().normalize()
-        today_trades = df[df["timestamp"].dt.normalize() == today]
-        content = today_trades.to_string(index=False) if not today_trades.empty else "No trades executed today."
+        df_log = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
+        df_log["timestamp"] = pd.to_datetime(df_log["timestamp"], errors="coerce")
+        df_log = df_log.dropna()
+        df_log["PnL"] = df_log.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
+        df_log = df_log.sort_values("timestamp")
+        df_log["CumulativePnL"] = df_log["PnL"].cumsum()
+        st.line_chart(df_log.set_index("timestamp")["CumulativePnL"])
     except Exception as e:
-        content = f"Error reading trade log: {e}"
+        st.warning(f"Chart error: {e}")
 
-    msg = EmailMessage()
-    msg["Subject"] = "📊 Daily AI Trade Summary"
-    msg["From"] = EMAIL
-    msg["To"] = EMAIL
-    msg.set_content(content)
+# Telegram test button
+if st.button("🔔 Test Telegram Alert"):
+    send_telegram_alert("TEST", "BUY", 100, 102, 98)
+    st.success("✅ Telegram alert sent!")
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(EMAIL, EMAIL_PASS)
-            smtp.send_message(msg)
-        print("✅ Email sent.")
-    except Exception as e:
-        print("❌ Email failed:", e)
-
-if "scheduler_started" not in st.session_state:
-    scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
-    scheduler.add_job(send_trade_summary_email, "cron", hour=16, minute=30)
-    scheduler.start()
-    st.session_state.scheduler_started = True
-    st.toast("📧 Daily Summary Email scheduled for 4:30 PM IST")
-
+# Email summary manually
 if st.button("📤 Send Daily Trade Summary Now"):
     send_trade_summary_email()
     st.success("📨 Summary email sent successfully!")
