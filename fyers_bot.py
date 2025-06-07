@@ -103,13 +103,13 @@ def get_fyers_positions(fyers):
         return []
 
 # Get available funds
-def get_fyers_funds():
+def get_fyers_funds(fyers):
     try:
         funds = fyers.funds()
-        return funds.get("fundLimit", {})
+        return funds.get("fund_limit", [])
     except Exception as e:
         print("[ERROR] Failed to fetch funds:", e)
-        return {}
+        return []
 
 # Send daily summary email
 # Send daily summary email
