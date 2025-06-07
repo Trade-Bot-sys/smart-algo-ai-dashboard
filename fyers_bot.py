@@ -94,7 +94,7 @@ def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2
             send_telegram_alert(symbol, action, price, tp_price, sl_price)
 
 # Get current positions
-def get_fyers_positions():
+def get_fyers_positions(fyers):
     try:
         positions = fyers.positions()
         return positions.get("netPositions", [])
