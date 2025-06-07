@@ -66,11 +66,23 @@ def place_order(symbol, side, qty):
         return {}
 
 # Check available funds
-def get_funds():
+# Get current positions from Fyers
+def get_fyers_positions():
     try:
-        return fyers.funds().get("fund_limit", [])
-    except:
+        positions = fyers.positions()
+        return positions.get("netPositions", [])
+    except Exception as e:
+        print("[ERROR] Failed to fetch positions:", e)
         return []
+
+# Get available funds from Fyers
+def get_fyers_funds():
+    try:
+        funds = fyers.funds()
+        return funds.get("fundLimit", {})
+    except Exception as e:
+        print("[ERROR] Failed to fetch funds:", e)
+        return {}
 
 # Log trade
 def log_trade(symbol, action, qty, entry, tp, sl):
