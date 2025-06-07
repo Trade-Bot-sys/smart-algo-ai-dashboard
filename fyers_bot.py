@@ -9,7 +9,7 @@ from fyers_apiv3.FyersApp import FyersApp  # ✅ Correct import
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
 APP_SECRET = st.secrets["FYERS"]["FYERS_APP_SECRET"]
 REDIRECT_URI = st.secrets["FYERS"]["FYERS_REDIRECT_URI"]
-ACCESS_TOKEN_PATH = "access_token.txt"
+ACCESS_TOKEN_PATH = st.secrets["FYERS"]["ACCESS_TOKEN"]
 
 # Generate new access token (manual step required)
 def generate_access_token():
