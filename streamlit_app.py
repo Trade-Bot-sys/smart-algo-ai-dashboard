@@ -1,8 +1,10 @@
 # 📈 Smart AI Trading Dashboard (Expanded Version with Full Features)
+import streamlit as st
+st.set_page_config(layout="wide", page_title="Smart AI Trading Dashboard")
+st.title("📈 Smart AI Trading Dashboard")
 
 import os
 import smtplib
-import streamlit as st
 from email.message import EmailMessage
 import pandas as pd
 import yfinance as yf
@@ -19,8 +21,6 @@ from fyers_bot import (
 )
 
 # other imports...
-st.set_page_config(layout="wide", page_title="Smart AI Trading Dashboard")
-st.title("📈 Smart AI Trading Dashboard")
 
 # ✅ Load Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
