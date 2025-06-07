@@ -10,7 +10,7 @@ REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
 ACCESS_TOKEN_PATH = "access_token.txt"
 
 def generate_access_token():
-    from fyers_apiv3.FyersApp import accessToken
+    from fyers_apiv3 import accessToken
     session = accessToken.SessionModel(client_id=APP_ID, secret_key=APP_SECRET, redirect_uri=REDIRECT_URI, response_type="code")
     print("\n[INFO] Go to this URL and login:")
     print(session.generate_authcode())
