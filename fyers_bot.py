@@ -7,7 +7,6 @@ import os
 import time
 import requests
 from fyers_apiv3 import fyersModel
-from fyers_apiv3 import accessToken
 
 # Load credentials securely from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
@@ -41,7 +40,7 @@ def place_order(fyers, symbol, side, qty):
         "validity": "DAY",
         "disclosedQty": 0,
         "offlineOrder": False,
-        "orderType": 1  # MARKET
+        "orderType": 1
     }
     response = fyers.place_order(order)
     print("[TRADE EXECUTED]", side, symbol, "| Qty:", qty, "| Response:", response)
@@ -49,6 +48,7 @@ def place_order(fyers, symbol, side, qty):
 
 # Log executed trades
 def log_trade(symbol, action, qty, entry_price, tp_price, sl_price):
+    os.makedirs("logs", exist_ok=True)
     with open("trade_log.csv", "a") as f:
         f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')},{symbol},{action},{qty},{entry_price},{tp_price},{sl_price}\n")
 
@@ -76,7 +76,10 @@ def run_trading_bot(signals_df, live=True, capital_per_trade=10000, tp_percent=2
             if live:
                 place_order(fyers, symbol, action, qty)
 
+            # ✅ LOG THE TRADE
+            log_trade(symbol, action, qty, price, tp_price, sl_price)
 
+# Send daily summary email
 def send_trade_summary_email():
     email_from = st.secrets["EMAIL"]["EMAIL_FROM"]
     email_to = st.secrets["EMAIL"]["EMAIL_TO"]
@@ -93,7 +96,7 @@ def send_trade_summary_email():
         print("[EMAIL] No trade entries to report.")
         return
 
-    latest_trades = trades[-10:]
+    latest_trades = trades[-10:]  # last 10 or less
     summary_html = "<br>".join([f"<b>{line.strip()}</b>" for line in latest_trades])
 
     msg = MIMEMultipart()
@@ -119,6 +122,3 @@ def send_trade_summary_email():
         print("[EMAIL SENT] Daily trade summary email sent successfully.")
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send summary email: {e}")
-
-
-            log_trade(symbol, action, qty, price, tp_price, sl_price)
