@@ -68,7 +68,7 @@ if st.button("Run AI Trade Now"):
 
 # Show live positions
 st.header("📦 Current Positions (Fyers)")
-positions = get_fyers_positions()
+positions = get_fyers_positions(fyers)
 if positions:
     df_positions = pd.DataFrame(positions)
     st.dataframe(df_positions[["symbol", "netQty", "avgPrice", "pnl"]])
