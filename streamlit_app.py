@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
-from fyers_apiv3 import fyersModel, accessToken
+from fyers_apiv3.auth import SessionModel  # ✅
 from fyers_bot import (
     run_trading_bot,
     get_fyers_positions,
@@ -30,6 +30,18 @@ EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
+session = SessionModel(
+    client_id=APP_ID,
+    secret_key=APP_SECRET,
+    redirect_uri=REDIRECT_URI,
+    response_type="code",
+    grant_type="authorization_code"
+)
+
+session.set_token(AUTH_CODE)
+response = session.generate_token()
+
+access_token = response["access_token"]
 
 # ✅ Generate or load access token
 @st.cache_data(ttl=3600)
