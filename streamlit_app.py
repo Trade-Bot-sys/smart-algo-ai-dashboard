@@ -1,4 +1,17 @@
 # 📈 Smart AI Trading Dashboard (Expanded Version with Full Features)
+import json
+with open("access_token.json") as f:
+    token_data = json.load(f)
+APP_ID = token_data["app_id"]
+ACCESS_TOKEN = token_data["access_token"]
+
+# ✅ Setup Fyers session
+fyers = fyersModel.FyersModel(
+    client_id=APP_ID,
+    token=f"{APP_ID}:{ACCESS_TOKEN}",
+    log_path="logs/"
+)
+
 import streamlit as st
 st.set_page_config(layout="wide", page_title="Smart AI Trading Dashboard")
 st.title("📈 Smart AI Trading Dashboard")
@@ -27,18 +40,6 @@ TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
 
 # ✅ Load access token from file
-import json
-with open("access_token.json") as f:
-    token_data = json.load(f)
-APP_ID = token_data["app_id"]
-ACCESS_TOKEN = token_data["access_token"]
-
-# ✅ Setup Fyers session
-fyers = fyersModel.FyersModel(
-    client_id=APP_ID,
-    token=f"{APP_ID}:{ACCESS_TOKEN}",
-    log_path="logs/"
-)
 
 # ✅ Load Nifty 500 stock list
 try:
