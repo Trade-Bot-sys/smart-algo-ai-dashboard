@@ -9,4 +9,5 @@ schedule
 matplotlib
 googlesearch-python
 pyTelegramBotAPI
+telebot
 selenium
