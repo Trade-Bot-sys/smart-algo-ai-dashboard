@@ -25,7 +25,7 @@ from fyers_bot import (
 
 # ✅ Load Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
-ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
+#ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
@@ -37,6 +37,13 @@ session = SessionModel(
     response_type="code",
     grant_type="authorization_code"
 )
+import json
+
+with open("access_token.json") as f:
+    token_data = json.load(f)
+
+APP_ID = token_data["app_id"]
+ACCESS_TOKEN = token_data["access_token"]
 
 session.set_token(AUTH_CODE)
 response = session.generate_token()
