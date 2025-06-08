@@ -8,9 +8,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import telebot
-#from fyers_apiv3 import accessToken
+#from fyers_apiv3.FyersWeb import accessToken  # ✅ For fyers-apiv3>=3.0
 
-# ✅ Load from environment
+# --- Load from environment ---
 APP_ID = os.getenv("FYERS_APP_ID")
 APP_SECRET = os.getenv("FYERS_APP_SECRET")
 REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
@@ -31,7 +31,6 @@ def refresh_token():
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
-
         driver = webdriver.Chrome(options=options)
         wait = WebDriverWait(driver, 20)
         driver.set_page_load_timeout(30)
@@ -57,10 +56,10 @@ def refresh_token():
         driver.save_screenshot("step4_pin.png")
 
         print("📦 Checking for auth code in URL...")
-        time.sleep(5)  # Extra wait for redirect
+        time.sleep(5)
         if "auth_code=" not in driver.current_url:
             driver.save_screenshot("error_no_auth_code.png")
-            raise Exception("❌ Auth code not found. Login might have failed.")
+            raise Exception("❌ Auth code not found in URL")
 
         auth_code = driver.current_url.split("auth_code=")[-1].split("&")[0]
         print("✅ Auth code received:", auth_code[:10], "...")
@@ -83,7 +82,7 @@ def refresh_token():
         return True
 
     except Exception as e:
-        print("❌ Exception occurred during token generation:", e)
+        print("❌ Exception occurred:", e)
         try:
             driver.save_screenshot("token_error.png")
         except:
@@ -96,7 +95,7 @@ def refresh_token():
         except:
             pass
 
-# ✅ Telegram Bot Handler
+# --- Telegram Bot Handler ---
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 @bot.message_handler(commands=["refresh"])
@@ -113,13 +112,13 @@ def manual_refresh(message):
 def start_msg(message):
     bot.reply_to(message, "👋 Use /refresh to refresh Fyers token manually.")
 
+# --- Main Entry Point ---
 print("🚀 Token bot running...")
 if __name__ == "__main__":
     IS_GITHUB = os.getenv("GITHUB_ACTIONS", "") == "true"
-
     if IS_GITHUB:
-        print("🔁 Running in GitHub Actions... refreshing token only")
+        print("🔁 Running inside GitHub Actions - single token refresh")
         refresh_token()
     else:
-        print("🚀 Running locally. Telegram Bot starting...")
+        print("💬 Running locally - Telegram bot active")
         bot.polling()
