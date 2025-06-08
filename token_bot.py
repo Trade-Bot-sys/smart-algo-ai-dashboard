@@ -27,20 +27,21 @@ def refresh_token():
         auth_url = f"https://api.fyers.in/api/v2/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=state123"
 
         options = Options()
-        options.add_argument("--headless")
+      # options.add_argument("--headless")  # TEMPORARILY disable headless
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
+        options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/99.0 Safari/537.36")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+
         driver = webdriver.Chrome(options=options)
         wait = WebDriverWait(driver, 20)
-        driver.set_page_load_timeout(30)
-
-        print("🌐 Navigating to Fyers auth page...")
         driver.get(auth_url)
-        driver.save_screenshot("step1_loaded.png")
 
-        print("📝 Entering username...")
-        wait.until(EC.presence_of_element_located((By.ID, "fy_username"))).send_keys(USERNAME)
+        print("🌐 Page source preview:")
+        print(driver.page_source[:500])  # ✅ Helps debug missing elements
+
+wait.until(EC.visibility_of_element_located((By.ID, "fy_username"))).send_keys(USERNAME)
         wait.until(EC.element_to_be_clickable((By.ID, "loginSubmit"))).click()
         driver.save_screenshot("step2_username.png")
 
