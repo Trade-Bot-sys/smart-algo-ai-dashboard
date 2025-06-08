@@ -2,8 +2,7 @@ import os, json, time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from fyers_apiv3 import accessToken  # ✅ Correct import for v3+
-#from fyers_apiv3.FyersApi.accessToken import SessionModel
+from fyers_apiv3.FyersWeb import accessToken  # ✅ Correct import for v3+
 import telebot
 
 # --- Load secrets from environment ---
@@ -45,10 +44,11 @@ def refresh_token():
         driver.find_element(By.ID, "loginSubmit").click()
         time.sleep(4)
 
-        if "auth_code=" not in driver.current_url:
+        current_url = driver.current_url
+        if "auth_code=" not in current_url:
             raise Exception("❌ Auth code not found. Login flow failed.")
-        auth_code = driver.current_url.split("auth_code=")[-1]
-        print("✅ Auth code received")
+        auth_code = current_url.split("auth_code=")[-1]
+        print("✅ Auth code received:", auth_code)
 
         session = accessToken.SessionModel(
             client_id=APP_ID,
@@ -59,16 +59,17 @@ def refresh_token():
         )
         session.set_token(auth_code)
         response = session.generate_token()
+        print("✅ Token response:", response)
 
         access_token = response["access_token"]
         with open(SESSION_PATH, "w") as f:
             json.dump({"app_id": APP_ID, "access_token": access_token}, f)
 
         print("✅ Access token saved to", SESSION_PATH)
-        return True
+        return True, response
     except Exception as e:
         print("❌ Error refreshing token:", e)
-        return False
+        return False, str(e)
     finally:
         try:
             driver.quit()
@@ -82,27 +83,17 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 def handle_refresh(message):
     if str(message.chat.id) == TELEGRAM_CHAT_ID:
         bot.reply_to(message, "🔄 Refreshing token now...")
-        success = refresh_token()
+        success, result = refresh_token()
         if success:
-            bot.send_message(message.chat.id, "✅ Token refreshed successfully!")
+            bot.send_message(message.chat.id, "✅ Token refreshed!\n\n🔐 Access Token:\n" + result["access_token"][:50] + "...")
         else:
-            bot.send_message(message.chat.id, "❌ Failed to refresh token.")
+            bot.send_message(message.chat.id, f"❌ Failed to refresh token:\n{result}")
     else:
-        bot.reply_to(message, "⛔ Unauthorized access.")
+        bot.reply_to(message, "⛔ Unauthorized user.")
 
 @bot.message_handler(commands=['start'])
 def welcome_msg(message):
-    bot.send_message(message.chat.id, "👋 Use /refresh to regenerate your Fyers token.\n⏰ Auto-refresh happens daily at 8 AM IST.")
-
-# Optional: Auto-refresh daily at 8 AM (only if needed)
-# import schedule, threading
-# def auto_refresh():
-#     if refresh_token():
-#         bot.send_message(TELEGRAM_CHAT_ID, "🔁 Token auto-refreshed at 8:00 AM.")
-#     else:
-#         bot.send_message(TELEGRAM_CHAT_ID, "⚠️ Auto-refresh failed.")
-# schedule.every().day.at("08:00").do(auto_refresh)
-# threading.Thread(target=lambda: schedule.run_pending(), daemon=True).start()
+    bot.send_message(message.chat.id, "👋 Welcome to the Fyers Token Bot!\nUse /refresh to regenerate your token.\n⏰ Auto-refresh is enabled via GitHub Actions at 8 AM IST daily.")
 
 # --- Run bot ---
 print("🚀 Telegram Token Bot is running...")
