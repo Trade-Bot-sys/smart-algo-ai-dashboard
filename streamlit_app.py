@@ -12,7 +12,6 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
-#from fyers_apiv3.auth import SessionModel  # ✅
 from fyers_bot import (
     run_trading_bot,
     get_fyers_positions,
@@ -21,64 +20,18 @@ from fyers_bot import (
     send_trade_summary_email
 )
 
-# other imports...
-
 # ✅ Load Streamlit secrets
-APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
-#ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
-session = SessionModel(
-    client_id=APP_ID,
-    secret_key=APP_SECRET,
-    redirect_uri=REDIRECT_URI,
-    response_type="code",
-    grant_type="authorization_code"
-)
-import json
 
+# ✅ Load access token from file
+import json
 with open("access_token.json") as f:
     token_data = json.load(f)
-
 APP_ID = token_data["app_id"]
 ACCESS_TOKEN = token_data["access_token"]
-
-session.set_token(AUTH_CODE)
-response = session.generate_token()
-
-access_token = response["access_token"]
-
-# ✅ Generate or load access token
-@st.cache_data(ttl=3600)
-def generate_access_token():
-    session = accessToken.SessionModel(
-        client_id=APP_ID,
-        secret_key=APP_SECRET,
-        redirect_uri=REDIRECT_URI,
-        response_type="code",
-        grant_type="authorization_code"
-    )
-    session.set_token(st.secrets["FYERS"]["AUTH_CODE"])
-    response = session.generate_token()
-    access_token = response["access_token"]
-    with open("access_token.txt", "w") as f:
-        f.write(access_token)
-    return access_token
-
-if os.path.exists("access_token.txt"):
-    with open("access_token.txt") as f:
-        ACCESS_TOKEN = f.read().strip()
-else:
-    ACCESS_TOKEN = generate_access_token()
-
-# ✅ Setup Fyers session
-fyers = fyersModel.FyersModel(
-    client_id=APP_ID,
-    token=f"{APP_ID}:{ACCESS_TOKEN}",
-    log_path="logs/"
-)
 
 # ✅ Setup Fyers session
 fyers = fyersModel.FyersModel(
@@ -148,7 +101,7 @@ data['Signal'] = ["HOLD"] * len(data)
 data.loc[data.index[-1], 'Signal'] = signal
 
 # Show Signal + Chart
-st.subheader(f"📍 Signal for {symbol}: {signal}")
+st.subheader(f"🔍 Signal for {symbol}: {signal}")
 fig = go.Figure()
 fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])
 if signal == "BUY":
@@ -190,63 +143,42 @@ if funds:
 else:
     st.warning("Funds unavailable")
 
-# ✅ Cumulative PnL Chart
-st.header("📊 PnL History")
-if os.path.exists("trade_log.csv"):
-    df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.dropna()
-    df["PnL"] = df.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
-    df = df.sort_values("timestamp")
-    df["CumulativePnL"] = df["PnL"].cumsum()
-    st.line_chart(df.set_index("timestamp")["CumulativePnL"])
-    
-    # 🔄 Use df instead of df_log
-    stock_options = df["symbol"].dropna().unique().tolist()
-    selected_stock = st.selectbox("Select Stock", stock_options, index=0 if stock_options else None)
-
-if selected_stock:
-    try:
-        hist_data = yf.download(selected_stock, period="2mo", interval="1d")
-        if not hist_data.empty:
-            fig2 = go.Figure()
-            fig2.add_candlestick(
-                x=hist_data.index,
-                open=hist_data["Open"],
-                high=hist_data["High"],
-                low=hist_data["Low"],
-                close=hist_data["Close"]
-            )
-            
-            # Plot past trades for this stock
-            stock_trades = df_log[df_log["symbol"] == selected_stock]
-            for _, row in stock_trades.iterrows():
-                color = "green" if row["action"] == "BUY" else "red"
-                label = row["action"].capitalize()
-                fig2.add_trace(go.Scatter(
-                    x=[row["timestamp"]],
-                    y=[row["entry"]],
-                    mode="markers+text",
-                    marker=dict(color=color, size=10),
-                    name=label,
-                    text=[label],
-                    textposition="top center" if row["action"] == "BUY" else "bottom center"
-                ))
-            st.subheader(f"📈 Trade Log Chart - {selected_stock}")
-            st.plotly_chart(fig2)
-        else:
-            st.warning("⚠️ No historical data found for selected stock.")
-    except Exception as e:
-        st.error(f"⚠️ Error loading chart: {e}")
-
-# ✅ Live Trade Chart Per Stock with Dropdown
-st.header("📌 Trade History by Stock")
+# ✅ Cumulative PnL Chart + Trade Log Dropdown
 if os.path.exists("trade_log.csv"):
     df_log = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
     df_log["timestamp"] = pd.to_datetime(df_log["timestamp"], errors="coerce")
     df_log = df_log.dropna()
-    
-    
+    df_log["PnL"] = df_log.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
+    df_log = df_log.sort_values("timestamp")
+    df_log["CumulativePnL"] = df_log["PnL"].cumsum()
+
+    st.header("📊 Cumulative PnL")
+    st.line_chart(df_log.set_index("timestamp")["CumulativePnL"])
+
+    stock_options = df_log["symbol"].dropna().unique().tolist()
+    selected_stock = st.selectbox("Select Stock", stock_options)
+
+    if selected_stock:
+        hist_data = yf.download(selected_stock, period="2mo", interval="1d")
+        fig2 = go.Figure()
+        fig2.add_candlestick(x=hist_data.index, open=hist_data["Open"], high=hist_data["High"], low=hist_data["Low"], close=hist_data["Close"])
+
+        trades = df_log[df_log["symbol"] == selected_stock]
+        for _, row in trades.iterrows():
+            color = "green" if row["action"] == "BUY" else "red"
+            label = row["action"].capitalize()
+            fig2.add_trace(go.Scatter(
+                x=[row["timestamp"]],
+                y=[row["entry"]],
+                mode="markers+text",
+                marker=dict(color=color, size=10),
+                name=label,
+                text=[label],
+                textposition="top center" if label == "Buy" else "bottom center"
+            ))
+        st.subheader(f"📈 Trade Log Chart - {selected_stock}")
+        st.plotly_chart(fig2)
+
 # ✅ Telegram Test
 if st.button("🔔 Test Telegram Alert"):
     send_telegram_alert("TEST", "BUY", 100, 102, 98)
