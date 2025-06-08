@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from apscheduler.schedulers.background import BackgroundScheduler
 from googlesearch import search
 from fyers_apiv3 import fyersModel
-from fyers_apiv3.auth import SessionModel  # ✅
+#from fyers_apiv3.auth import SessionModel  # ✅
 from fyers_bot import (
     run_trading_bot,
     get_fyers_positions,
