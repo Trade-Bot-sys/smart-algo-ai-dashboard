@@ -1,4 +1,19 @@
 # 📈 Smart AI Trading Dashboard (Expanded Version with Full Features)
+# 🔁 Run token generator before anything else
+import os
+import json
+
+# ✅ Run the token generator script
+if not os.path.exists("access_token.json"):
+    os.system("python generate_token.py")
+
+# ✅ Load the token
+with open("access_token.json") as f:
+    token_data = json.load(f)
+
+APP_ID = token_data["app_id"]
+ACCESS_TOKEN = token_data["access_token"]
+
 import json
 with open("access_token.json") as f:
     token_data = json.load(f)
