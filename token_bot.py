@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import telebot
-from fyers_apiv3 import accessToken
+#from fyers_apiv3 import accessToken
 
 # ✅ Load from environment
 APP_ID = os.getenv("FYERS_APP_ID")
