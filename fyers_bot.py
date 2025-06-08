@@ -19,14 +19,19 @@ EMAIL_TO = st.secrets["EMAIL"]["EMAIL_TO"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
+import json
+from fyers_apiv3 import fyersModel
 
-# ✅ Fyers login
-fyers = fyersModel.FyersModel(
-    client_id=APP_ID,
-    token=f"{APP_ID}:{ACCESS_TOKEN}",
-    log_path="logs/"
-)
+def load_fyers():
+    with open("access_token.json") as f:
+        token_data = json.load(f)
+    return fyersModel.FyersModel(
+        client_id=token_data["app_id"],
+        token=f"{token_data['app_id']}:{token_data['access_token']}",
+        log_path="logs/"
+    )
 
+# Use this instead of hardcoding fyers = fyersModel.FyersModel(...)
 # ✅ Load stock list
 try:
     df_stocks = pd.read_csv("data/nifty500list.csv")
