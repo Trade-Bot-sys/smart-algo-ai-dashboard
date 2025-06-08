@@ -2,7 +2,8 @@ import os, json, time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from fyers_apiv3.FyersWeb import accessToken  # ✅ Correct import for v3+
+from fyers_apiv3.accessToken import SessionModel
+#from fyers_apiv3.FyersWeb import accessToken  # ✅ Correct import for v3+
 import telebot
 
 # --- Load secrets from environment ---
