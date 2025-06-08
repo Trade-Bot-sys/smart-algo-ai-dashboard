@@ -27,56 +27,66 @@ def refresh_token():
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        driver = webdriver.Chrome(options=options)
+        options.add_argument("--window-size=1920,1080")  # ✅ Ensure proper page rendering
 
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(20)
+
+        print("🌐 Navigating to Fyers auth page...")
         driver.get(auth_url)
         time.sleep(3)
+        driver.save_screenshot("step1_loaded.png")  # ✅ Screenshot for debug
+
+        print("📝 Entering username...")
         driver.find_element(By.ID, "fy_username").send_keys(USERNAME)
         driver.find_element(By.ID, "loginSubmit").click()
         time.sleep(2)
+        driver.save_screenshot("step2_username.png")
+
+        print("🔐 Entering password...")
         driver.find_element(By.ID, "fy_password").send_keys(PASSWORD)
         driver.find_element(By.ID, "loginSubmit").click()
         time.sleep(2)
+        driver.save_screenshot("step3_password.png")
+
+        print("🔢 Entering PIN...")
         for i, d in enumerate(PIN, 1):
             driver.find_element(By.ID, f"pin{i}").send_keys(d)
         driver.find_element(By.ID, "loginSubmit").click()
         time.sleep(4)
+        driver.save_screenshot("step4_pin.png")
 
-        current_url = driver.current_url
-        if "auth_code=" not in current_url:
-            raise Exception("❌ Login failed. Auth code not found.")
-        auth_code = current_url.split("auth_code=")[-1].split("&")[0]
-        print("✅ Auth code received:", auth_code)
+        print("📦 Checking for auth code in URL...")
+        if "auth_code=" not in driver.current_url:
+            driver.save_screenshot("error_no_auth_code.png")  # 👀 Capture failure
+            raise Exception("❌ Auth code not found. Login might have failed.")
 
-        # Exchange auth code for access token
-        token_url = "https://api.fyers.in/api/v2/token"
-        payload = {
-            "grant_type": "authorization_code",
-            "appIdHash": APP_ID,
-            "code": auth_code,
-            "secretKey": APP_SECRET
-        }
-        headers = {"content-type": "application/json"}
-        response = requests.post(token_url, json=payload, headers=headers)
-        response.raise_for_status()
-        access_token = response.json().get("access_token")
+        auth_code = driver.current_url.split("auth_code=")[-1]
+        print("✅ Auth code received:", auth_code[:10], "...")
 
-        if not access_token:
-            raise Exception("❌ Failed to get access token.")
+        # Continue to exchange token...
+        session = accessToken.SessionModel(
+            client_id=APP_ID,
+            secret_key=APP_SECRET,
+            redirect_uri=REDIRECT_URI,
+            response_type="code",
+            grant_type="authorization_code"
+        )
+        session.set_token(auth_code)
+        response = session.generate_token()
 
-        # Save token
+        access_token = response["access_token"]
         with open(SESSION_PATH, "w") as f:
-            json.dump({
-                "app_id": APP_ID,
-                "access_token": access_token
-            }, f)
+            json.dump({"app_id": APP_ID, "access_token": access_token}, f)
 
-        print("✅ Token saved successfully!")
+        print("✅ Access token saved to", SESSION_PATH)
         return True
 
     except Exception as e:
-        print("❌ Error:", e)
+        print("❌ Exception occurred during token generation:", e)
+        driver.save_screenshot("token_error.png")
         return False
+
     finally:
         try:
             driver.quit()
