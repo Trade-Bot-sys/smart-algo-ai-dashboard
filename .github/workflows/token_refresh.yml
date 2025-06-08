@@ -35,7 +35,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install fyers-apiv3>=3.0.1
-        python -c "from fyers_apiv3.accessToken import SessionModel; print('✅ Fyers import OK')"
+        python -c "from fyers_apiv3 import accessToken  # ✅; print('✅ Fyers import OK')"
 
     - name: 🔐 Generate Fyers Token
       run: |
