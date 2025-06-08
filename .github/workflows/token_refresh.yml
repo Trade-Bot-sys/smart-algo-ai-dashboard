@@ -30,7 +30,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install fyers-apiv3==2.0.5  # ✅ Fix for SessionModel
 
     - name: 🔐 Generate Fyers Token
       run: |
