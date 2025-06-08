@@ -5,7 +5,10 @@ import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import telebot
+from fyers_apiv3 import accessToken
 
 # ✅ Load from environment
 APP_ID = os.getenv("FYERS_APP_ID")
@@ -27,44 +30,41 @@ def refresh_token():
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")  # ✅ Ensure proper page rendering
+        options.add_argument("--window-size=1920,1080")
 
         driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(20)
+        wait = WebDriverWait(driver, 20)
+        driver.set_page_load_timeout(30)
 
         print("🌐 Navigating to Fyers auth page...")
         driver.get(auth_url)
-        time.sleep(3)
-        driver.save_screenshot("step1_loaded.png")  # ✅ Screenshot for debug
+        driver.save_screenshot("step1_loaded.png")
 
         print("📝 Entering username...")
-        driver.find_element(By.ID, "fy_username").send_keys(USERNAME)
-        driver.find_element(By.ID, "loginSubmit").click()
-        time.sleep(2)
+        wait.until(EC.presence_of_element_located((By.ID, "fy_username"))).send_keys(USERNAME)
+        wait.until(EC.element_to_be_clickable((By.ID, "loginSubmit"))).click()
         driver.save_screenshot("step2_username.png")
 
         print("🔐 Entering password...")
-        driver.find_element(By.ID, "fy_password").send_keys(PASSWORD)
-        driver.find_element(By.ID, "loginSubmit").click()
-        time.sleep(2)
+        wait.until(EC.presence_of_element_located((By.ID, "fy_password"))).send_keys(PASSWORD)
+        wait.until(EC.element_to_be_clickable((By.ID, "loginSubmit"))).click()
         driver.save_screenshot("step3_password.png")
 
         print("🔢 Entering PIN...")
         for i, d in enumerate(PIN, 1):
-            driver.find_element(By.ID, f"pin{i}").send_keys(d)
-        driver.find_element(By.ID, "loginSubmit").click()
-        time.sleep(4)
+            wait.until(EC.presence_of_element_located((By.ID, f"pin{i}"))).send_keys(d)
+        wait.until(EC.element_to_be_clickable((By.ID, "loginSubmit"))).click()
         driver.save_screenshot("step4_pin.png")
 
         print("📦 Checking for auth code in URL...")
+        time.sleep(5)  # Extra wait for redirect
         if "auth_code=" not in driver.current_url:
-            driver.save_screenshot("error_no_auth_code.png")  # 👀 Capture failure
+            driver.save_screenshot("error_no_auth_code.png")
             raise Exception("❌ Auth code not found. Login might have failed.")
 
-        auth_code = driver.current_url.split("auth_code=")[-1]
+        auth_code = driver.current_url.split("auth_code=")[-1].split("&")[0]
         print("✅ Auth code received:", auth_code[:10], "...")
 
-        # Continue to exchange token...
         session = accessToken.SessionModel(
             client_id=APP_ID,
             secret_key=APP_SECRET,
@@ -84,7 +84,10 @@ def refresh_token():
 
     except Exception as e:
         print("❌ Exception occurred during token generation:", e)
-        driver.save_screenshot("token_error.png")
+        try:
+            driver.save_screenshot("token_error.png")
+        except:
+            pass
         return False
 
     finally:
@@ -116,7 +119,7 @@ if __name__ == "__main__":
 
     if IS_GITHUB:
         print("🔁 Running in GitHub Actions... refreshing token only")
-        refresh_token()  # Just refresh once and exit
+        refresh_token()
     else:
         print("🚀 Running locally. Telegram Bot starting...")
         bot.polling()
