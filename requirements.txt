@@ -8,5 +8,5 @@ requests
 schedule
 matplotlib
 googlesearch-python
+pyTelegramBotAPI
 selenium
-pyTelegramBotAPI==4.12.0
