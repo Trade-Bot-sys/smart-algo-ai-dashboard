@@ -2,11 +2,10 @@ import os, json, time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-#from fyers_apiv3 import accessToken
-from fyers_apiv3.accessToken import SessionModel
+from fyers_apiv3.FyersApi.accessToken import SessionModel
 import telebot
 
-# --- Secrets from environment ---
+# --- Load secrets from environment ---
 APP_ID = os.getenv("FYERS_APP_ID")
 APP_SECRET = os.getenv("FYERS_APP_SECRET")
 REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI")
@@ -22,6 +21,7 @@ def refresh_token():
     try:
         print("🔄 Starting token refresh...")
         auth_url = f"https://api.fyers.in/api/v2/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=state123"
+
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
@@ -44,6 +44,8 @@ def refresh_token():
         driver.find_element(By.ID, "loginSubmit").click()
         time.sleep(4)
 
+        if "auth_code=" not in driver.current_url:
+            raise Exception("❌ Auth code not found. Login flow failed.")
         auth_code = driver.current_url.split("auth_code=")[-1]
         print("✅ Auth code received")
 
@@ -58,11 +60,10 @@ def refresh_token():
         response = session.generate_token()
 
         access_token = response["access_token"]
-
         with open(SESSION_PATH, "w") as f:
             json.dump({"app_id": APP_ID, "access_token": access_token}, f)
 
-        print("✅ Access token saved to file.")
+        print("✅ Access token saved to", SESSION_PATH)
         return True
     except Exception as e:
         print("❌ Error refreshing token:", e)
@@ -92,18 +93,16 @@ def handle_refresh(message):
 def welcome_msg(message):
     bot.send_message(message.chat.id, "👋 Use /refresh to regenerate your Fyers token.\n⏰ Auto-refresh happens daily at 8 AM IST.")
 
-# --- Optional: Background refresh via schedule ---
-# You can optionally include this
+# Optional: Auto-refresh daily at 8 AM (only if needed)
 # import schedule, threading
 # def auto_refresh():
 #     if refresh_token():
 #         bot.send_message(TELEGRAM_CHAT_ID, "🔁 Token auto-refreshed at 8:00 AM.")
 #     else:
 #         bot.send_message(TELEGRAM_CHAT_ID, "⚠️ Auto-refresh failed.")
-
 # schedule.every().day.at("08:00").do(auto_refresh)
 # threading.Thread(target=lambda: schedule.run_pending(), daemon=True).start()
 
-# 🔁 Keep bot running
+# --- Run bot ---
 print("🚀 Telegram Token Bot is running...")
 bot.polling()
