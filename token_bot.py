@@ -27,13 +27,15 @@ def refresh_token():
         auth_url = f"https://api.fyers.in/api/v2/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=state123"
 
         options = Options()
-        # options.add_argument("--headless")  # Uncomment for headless mode
+        # options.add_argument("--headless")  # Enable for full automation
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
         options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/99.0 Safari/537.36")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
+# ✅ Add this line to avoid profile conflicts
+        options.add_argument(f"--user-data-dir=/tmp/chrome-user-data-{int(time.time())}")
         driver = webdriver.Chrome(options=options)
         wait = WebDriverWait(driver, 20)
 
