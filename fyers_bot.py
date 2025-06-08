@@ -1,4 +1,4 @@
-import os, time, threading, requests, schedule, smtplib
+import os, time, threading, requests, schedule, smtplib, json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -13,15 +13,13 @@ os.makedirs("logs", exist_ok=True)
 
 # ✅ Load credentials from Streamlit secrets
 APP_ID = st.secrets["FYERS"]["FYERS_APP_ID"]
-ACCESS_TOKEN = st.secrets["FYERS"]["ACCESS_TOKEN"]
 EMAIL_FROM = st.secrets["EMAIL"]["EMAIL_FROM"]
 EMAIL_TO = st.secrets["EMAIL"]["EMAIL_TO"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
-import json
-from fyers_apiv3 import fyersModel
 
+# ✅ Load Fyers client from token file
 def load_fyers():
     with open("access_token.json") as f:
         token_data = json.load(f)
@@ -31,7 +29,6 @@ def load_fyers():
         log_path="logs/"
     )
 
-# Use this instead of hardcoding fyers = fyersModel.FyersModel(...)
 # ✅ Load stock list
 try:
     df_stocks = pd.read_csv("data/nifty500list.csv")
@@ -42,7 +39,8 @@ except:
 @st.cache_data(ttl=60)
 def get_live_price(symbol):
     try:
-        headers = {"Authorization": f"Bearer {APP_ID}:{ACCESS_TOKEN}"}
+        fyers = load_fyers()
+        headers = {"Authorization": f"Bearer {fyers.token}"}
         r = requests.get("https://api.fyers.in/data-rest/v2/quotes", params={"symbols": symbol}, headers=headers)
         return r.json()['d'][0]['v']['lp']
     except:
@@ -50,6 +48,7 @@ def get_live_price(symbol):
 
 def place_order(symbol, side, qty):
     try:
+        fyers = load_fyers()
         return fyers.place_order({
             "symbol": symbol, "qty": qty, "type": 2,
             "side": 1 if side == "BUY" else -1,
@@ -64,6 +63,7 @@ def place_order(symbol, side, qty):
 
 def get_fyers_positions():
     try:
+        fyers = load_fyers()
         positions = fyers.positions()
         return positions.get("netPositions", [])
     except Exception as e:
@@ -72,6 +72,7 @@ def get_fyers_positions():
 
 def get_fyers_funds():
     try:
+        fyers = load_fyers()
         return fyers.funds().get("fundLimit", [])
     except Exception as e:
         print("[FUNDS ERROR]", e)
@@ -190,7 +191,7 @@ def start_scheduler():
 
 def render_dashboard():
     st.title("📊 Smart AI Trading Dashboard")
-    
+
     # Portfolio Positions
     st.subheader("📦 Current Positions (Fyers)")
     positions = get_fyers_positions()
