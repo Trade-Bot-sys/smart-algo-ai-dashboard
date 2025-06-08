@@ -47,8 +47,8 @@ jobs:
         echo "FYERS_APP_ID present? ${{ secrets.FYERS_APP_ID != '' }}"
         echo "FYERS_USERNAME present? ${{ secrets.FYERS_USERNAME != '' }}"
 
-    - name: 🔐 Run token refresh bot
-      run: python token_bot.py
+    - name: 🔐 Run token refresh script
+      run: python refresh_token.py
 
     - name: 📂 Upload token file
       uses: actions/upload-artifact@v4
