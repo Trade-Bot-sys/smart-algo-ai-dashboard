@@ -4,8 +4,17 @@ import os
 import json
 
 # ✅ Run the token generator script
+#if not os.path.exists("access_token.json"):
+    #os.system("python generate_token.py")
+import subprocess
+
 if not os.path.exists("access_token.json"):
-    os.system("python generate_token.py")
+    result = subprocess.run(["python", "generate_token.py"], capture_output=True, text=True)
+    print("Token generation output:", result.stdout)
+    print("Token generation errors:", result.stderr)
+
+    if not os.path.exists("access_token.json"):
+        raise FileNotFoundError("❌ Token generation failed. access_token.json was not created.")
 
 # ✅ Load the token
 with open("access_token.json") as f:
