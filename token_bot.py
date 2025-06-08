@@ -111,4 +111,12 @@ def start_msg(message):
     bot.reply_to(message, "👋 Use /refresh to refresh Fyers token manually.")
 
 print("🚀 Token bot running...")
-bot.polling()
+if __name__ == "__main__":
+    IS_GITHUB = os.getenv("GITHUB_ACTIONS", "") == "true"
+
+    if IS_GITHUB:
+        print("🔁 Running in GitHub Actions... refreshing token only")
+        refresh_token()  # Just refresh once and exit
+    else:
+        print("🚀 Running locally. Telegram Bot starting...")
+        bot.polling()
