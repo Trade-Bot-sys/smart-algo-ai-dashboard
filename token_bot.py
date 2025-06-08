@@ -2,7 +2,8 @@ import os, json, time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from fyers_apiv3 import accessToken
+#from fyers_apiv3 import accessToken
+from fyers_apiv3.accessToken import SessionModel
 import telebot
 
 # --- Secrets from environment ---
@@ -46,7 +47,7 @@ def refresh_token():
         auth_code = driver.current_url.split("auth_code=")[-1]
         print("✅ Auth code received")
 
-        session = accessToken.SessionModel(
+        session = SessionModel(
             client_id=APP_ID,
             secret_key=APP_SECRET,
             redirect_uri=REDIRECT_URI,
