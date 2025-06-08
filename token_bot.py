@@ -51,7 +51,7 @@ def refresh_token():
         auth_code = current_url.split("auth_code=")[-1]
         print("✅ Auth code received:", auth_code)
 
-        session = accessToken.SessionModel(
+        session = SessionModel(
             client_id=APP_ID,
             secret_key=APP_SECRET,
             redirect_uri=REDIRECT_URI,
