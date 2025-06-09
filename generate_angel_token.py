@@ -3,30 +3,27 @@ import json
 import pyotp
 from smartapi.smartConnect import SmartConnect
 
-# ✅ Load credentials from GitHub Actions secrets/environment
-client_id = os.getenv("ANGEL_CLIENT_ID")
-password = os.getenv("ANGEL_PASSWORD")
+# ✅ Load credentials from env (GitHub Actions or .env)
 api_key = os.getenv("ANGEL_API_KEY")
+client_code = os.getenv("ANGEL_CLIENT_ID")
 totp_secret = os.getenv("ANGEL_TOTP_SECRET")
 
-# ✅ Generate TOTP
+# ✅ Generate current TOTP
 totp = pyotp.TOTP(totp_secret).now()
 
-# ✅ Initialize SmartConnect
-obj = SmartConnect(api_key)
-
-# ✅ Generate session using positional arguments (required in SmartAPI v1.1.0)
+# ✅ Initialize SmartConnect and generate session
 try:
-    session_data = obj.generateSession(client_id, password, totp)
+    obj = SmartConnect(api_key)
+    session_data = obj.generateSession(api_key, client_code, totp)
     access_token = session_data["data"]["access_token"]
 
-    # ✅ Save access token to file
+    # ✅ Save access token to JSON file
     with open("access_token.json", "w") as f:
         json.dump({
-            "client_id": client_id,
+            "client_id": client_code,
             "access_token": access_token
         }, f)
 
-    print("✅ Access token generated and saved successfully.")
+    print("✅ Access token generated and saved.")
 except Exception as e:
-    print("❌ Failed to generate token:", e)
+    print("❌ Error generating token:", e)
