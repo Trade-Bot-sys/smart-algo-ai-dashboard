@@ -1,37 +1,52 @@
 import os
 import json
-import pyotp
-from smartapi.smartConnect import SmartConnect
+import requests
 
-# ✅ Load credentials from environment
+# ✅ Load from environment variables
 api_key = os.getenv("ANGEL_API_KEY")
 client_code = os.getenv("ANGEL_CLIENT_ID")
-pin = os.getenv("ANGEL_PASSWORD")  # 🔑 This is your Angel One login PIN
-totp_secret = os.getenv("ANGEL_TOTP_SECRET")
+mpin = os.getenv("ANGEL_MPIN")  # 🔐 NEW: MPIN from your Angel One app
 
-# ✅ Generate TOTP
-totp = pyotp.TOTP(totp_secret).now()
-print("🔐 TOTP:", totp)
+# ✅ Angel login URL (Login by MPIN)
+url = "https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByMpin"
 
-# ✅ Authenticate with SmartAPI
+# ✅ Required headers
+headers = {
+    "X-ClientLocalIP": "127.0.0.1",
+    "X-ClientPublicIP": "127.0.0.1",
+    "X-MACAddress": "AA:BB:CC:DD:EE:FF",
+    "X-PrivateKey": api_key,
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}
+
+# ✅ Payload with MPIN
+payload = {
+    "clientcode": client_code,
+    "mpin": mpin
+}
+
+# ✅ Send request
+print("📨 Logging in with client:", client_code)
+response = requests.post(url, headers=headers, json=payload)
+
 try:
-    obj = SmartConnect(api_key=api_key)
-    print(f"📨 Logging in as: {client_code}")
+    data = response.json()
+    print("📦 Response:", json.dumps(data, indent=2))
 
-    session = obj.generateSession(client_code, pin, totp)
-    print("📦 Full response:", json.dumps(session, indent=2))
+    if not data.get("status"):
+        raise Exception(f"Login failed: {data.get('message')}")
 
-    if not session or not session.get("data"):
-        raise Exception("Login failed or missing token.")
-
-    access_token = session["data"]["access_token"]
+    access_token = data["data"]["jwtToken"]
     with open("access_token.json", "w") as f:
         json.dump({
             "client_id": client_code,
             "access_token": access_token
         }, f)
 
-    print("✅ Access token saved successfully.")
+    print("✅ Access token saved successfully!")
 
 except Exception as e:
-    print("❌ Error generating token:", e)
+    print("❌ Login failed:", e)
