@@ -1,46 +1,37 @@
 import os
 import json
 import pyotp
-import requests
+from smartapi.smartConnect import SmartConnect
 
-# Load from environment
+# ✅ Load credentials from environment
 api_key = os.getenv("ANGEL_API_KEY")
 client_code = os.getenv("ANGEL_CLIENT_ID")
+pin = os.getenv("ANGEL_PASSWORD")  # 🔑 This is your Angel One login PIN
 totp_secret = os.getenv("ANGEL_TOTP_SECRET")
 
+# ✅ Generate TOTP
 totp = pyotp.TOTP(totp_secret).now()
 print("🔐 TOTP:", totp)
 
-url = "https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByPassword"
-
-headers = {
-    "X-ClientLocalIP": "127.0.0.1",
-    "X-ClientPublicIP": "127.0.0.1",
-    "X-MACAddress": "AA:BB:CC:DD:EE:FF",
-    "X-PrivateKey": api_key,
-    "X-UserType": "USER",
-    "X-SourceID": "WEB",
-    "Content-Type": "application/json",
-    "Accept": "application/json"
-}
-
-payload = {
-    "clientcode": client_code,
-    "password": totp  # TOTP as password
-}
-
-response = requests.post(url, headers=headers, json=payload)
-
+# ✅ Authenticate with SmartAPI
 try:
-    data = response.json()
-    print("📦 Full response:", json.dumps(data, indent=2))
-    if not data.get("status"):
-        raise Exception(f"Login failed: {data.get('message')}")
+    obj = SmartConnect(api_key=api_key)
+    print(f"📨 Logging in as: {client_code}")
 
-    access_token = data["data"]["jwtToken"]
+    session = obj.generateSession(client_code, pin, totp)
+    print("📦 Full response:", json.dumps(session, indent=2))
+
+    if not session or not session.get("data"):
+        raise Exception("Login failed or missing token.")
+
+    access_token = session["data"]["access_token"]
     with open("access_token.json", "w") as f:
-        json.dump({"client_id": client_code, "access_token": access_token}, f)
+        json.dump({
+            "client_id": client_code,
+            "access_token": access_token
+        }, f)
 
-    print("✅ Access token saved.")
+    print("✅ Access token saved successfully.")
+
 except Exception as e:
-    print("❌ Login failed:", e)
+    print("❌ Error generating token:", e)
