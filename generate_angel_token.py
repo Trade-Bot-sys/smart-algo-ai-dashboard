@@ -2,39 +2,40 @@ import os
 import json
 import requests
 
-# ✅ Load from environment variables
+# 🔐 Load credentials from environment
+client_id = os.getenv("ANGEL_CLIENT_ID")
 api_key = os.getenv("ANGEL_API_KEY")
-client_code = os.getenv("ANGEL_CLIENT_ID")
-mpin = os.getenv("ANGEL_MPIN")  # 🔐 NEW: MPIN from your Angel One app
+mpin = os.getenv("ANGEL_MPIN")
 
-# ✅ Angel login URL (Login by MPIN)
+print("📨 Logging in with client:", client_id)
+
+# 🌐 Endpoint
 url = "https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByMpin"
 
-# ✅ Required headers
+# 📦 Headers
 headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
     "X-ClientLocalIP": "127.0.0.1",
     "X-ClientPublicIP": "127.0.0.1",
     "X-MACAddress": "AA:BB:CC:DD:EE:FF",
-    "X-PrivateKey": api_key,
-    "X-UserType": "USER",
-    "X-SourceID": "WEB",
-    "Content-Type": "application/json",
-    "Accept": "application/json"
+    "X-PrivateKey": api_key
 }
 
-# ✅ Payload with MPIN
+# 📨 Payload
 payload = {
-    "clientcode": client_code,
+    "clientcode": client_id,
     "mpin": mpin
 }
 
-# ✅ Send request
-print("📨 Logging in with client:", client_code)
+# 🔄 Request
 response = requests.post(url, headers=headers, json=payload)
 
 try:
     data = response.json()
-    print("📦 Response:", json.dumps(data, indent=2))
+    print("📦 Full response:", json.dumps(data, indent=2))
 
     if not data.get("status"):
         raise Exception(f"Login failed: {data.get('message')}")
@@ -42,11 +43,14 @@ try:
     access_token = data["data"]["jwtToken"]
     with open("access_token.json", "w") as f:
         json.dump({
-            "client_id": client_code,
+            "client_id": client_id,
             "access_token": access_token
         }, f)
 
     print("✅ Access token saved successfully!")
 
+except json.JSONDecodeError:
+    print("❌ Failed to parse JSON. Raw response:")
+    print(response.text)
 except Exception as e:
     print("❌ Login failed:", e)
