@@ -10,6 +10,6 @@ googlesearch-python
 pyTelegramBotAPI
 telebot
 selenium
-SmartApi==1.1.0
+smartapi-python==1.1.0
 pyotp
 logzero
