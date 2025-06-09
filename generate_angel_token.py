@@ -1,7 +1,7 @@
 import os
 import json
 import pyotp
-from smartapi import SmartConnect  # ✅ Use lowercase "smartapi"
+from smartapi.smartConnect import SmartConnect  # ✅ Use lowercase "smartapi"
 
 # 🔐 Load credentials from GitHub Actions secrets/environment
 client_id = os.getenv("ANGEL_CLIENT_ID")
