@@ -26,9 +26,12 @@ payload = {
 
 response = requests.post(url, headers=headers, json=payload)
 
+print("🌐 Status Code:", response.status_code)
+print("🌐 Raw Response:", response.text[:300])  # Avoid long dumps
+
 try:
     data = response.json()
-    print("📦 Response:", json.dumps(data, indent=2))
+    print("📦 Response (Parsed):", json.dumps(data, indent=2))
 
     if not data.get("status"):
         raise Exception(f"Login failed: {data.get('message')}")
@@ -40,5 +43,8 @@ try:
             "access_token": access_token
         }, f)
     print("✅ Access token saved.")
+except json.JSONDecodeError:
+    print("❌ Failed to parse JSON. Raw response:")
+    print(response.text)
 except Exception as e:
     print("❌ Login failed:", e)
