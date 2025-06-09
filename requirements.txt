@@ -12,3 +12,4 @@ telebot
 selenium
 SmartApi
 pyotp
+logzero
