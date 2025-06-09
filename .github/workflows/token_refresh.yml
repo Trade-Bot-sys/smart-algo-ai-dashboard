@@ -40,7 +40,11 @@ jobs:
         echo "ANGEL_PASSWORD present? ${{ secrets.ANGEL_PASSWORD != '' }}"
         echo "ANGEL_API_KEY present? ${{ secrets.ANGEL_API_KEY != '' }}"
         echo "ANGEL_TOTP_SECRET present? ${{ secrets.ANGEL_TOTP_SECRET != '' }}"
-    
+    - name: 🔍 Check Secrets
+      run: |
+        echo "Client ID present: ${{ secrets.ANGEL_CLIENT_ID != '' }}"
+        echo "API key present: ${{ secrets.ANGEL_API_KEY != '' }}"
+        echo "MPIN present: ${{ secrets.ANGEL_MPIN != '' }}"
     - name: 🔐 Generate and save token
       run: |
         python generate_angel_token.py
