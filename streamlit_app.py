@@ -1,98 +1,91 @@
-# 📈 Smart AI Trading Dashboard (Expanded Version with Full Features)
-# 🔁 Run token generator before anything else
 import os
 import json
-
-# ✅ Run the token generator script
-#if not os.path.exists("access_token.json"):
-    #os.system("python generate_token.py")
-import subprocess
-
-if not os.path.exists("access_token.json"):
-    result = subprocess.run(["python", "generate_token.py"], capture_output=True, text=True)
-    print("Token generation output:", result.stdout)
-    print("Token generation errors:", result.stderr)
-
-    if not os.path.exists("access_token.json"):
-        raise FileNotFoundError("❌ Token generation failed. access_token.json was not created.")
-
-# ✅ Load the token
-with open("access_token.json") as f:
-    token_data = json.load(f)
-
-APP_ID = token_data["app_id"]
-ACCESS_TOKEN = token_data["access_token"]
-
-import json
-with open("access_token.json") as f:
-    token_data = json.load(f)
-APP_ID = token_data["app_id"]
-ACCESS_TOKEN = token_data["access_token"]
-
-# ✅ Setup Fyers session
-fyers = fyersModel.FyersModel(
-    client_id=APP_ID,
-    token=f"{APP_ID}:{ACCESS_TOKEN}",
-    log_path="logs/"
-)
-
+import requests
+import pandas as pd
+import yfinance as yf
 import streamlit as st
+import plotly.graph_objects as go
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+
+# ✅ Set Streamlit config
 st.set_page_config(layout="wide", page_title="Smart AI Trading Dashboard")
 st.title("📈 Smart AI Trading Dashboard")
 
-import os
-import smtplib
-from email.message import EmailMessage
-import pandas as pd
-import yfinance as yf
-import plotly.graph_objects as go
-from apscheduler.schedulers.background import BackgroundScheduler
-from googlesearch import search
-from fyers_apiv3 import fyersModel
-from fyers_bot import (
-    run_trading_bot,
-    get_fyers_positions,
-    get_fyers_funds,
-    send_telegram_alert,
-    send_trade_summary_email
-)
-
-# ✅ Load Streamlit secrets
+# ✅ Load secrets
 EMAIL = st.secrets["EMAIL"]["EMAIL_ADDRESS"]
 EMAIL_PASS = st.secrets["EMAIL"]["EMAIL_PASSWORD"]
 TELEGRAM_TOKEN = st.secrets["ALERTS"]["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = st.secrets["ALERTS"]["TELEGRAM_CHAT_ID"]
 
-# ✅ Load access token from file
+# ✅ Load Angel One access token
+with open("access_token.json") as f:
+    token_data = json.load(f)
+client_id = token_data["client_id"]
+access_token = token_data["access_token"]
 
-# ✅ Load Nifty 500 stock list
+# ✅ Stock list
 try:
-    nifty_df = pd.read_csv("data/nifty500list.csv")
-    STOCK_LIST = [f"{s}.NS" for s in nifty_df["Symbol"].dropna()]
+    df_stocks = pd.read_csv("data/nifty500list.csv")
+    STOCK_LIST = [f"{s.strip()}.NS" for s in df_stocks["Symbol"] if isinstance(s, str)]
 except:
     STOCK_LIST = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"]
 
-# ✅ Google News Sentiment Analysis
-@st.cache_data(ttl=3600)
-def news_sentiment_score(symbol):
-    query = f"{symbol} stock news site:moneycontrol.com OR site:economictimes.indiatimes.com"
+# ✅ Get live price
+@st.cache_data(ttl=60)
+def get_live_price(symbol):
     try:
-        return len(list(search(query, num_results=5)))
+        df = yf.download(symbol, period="1d", interval="1m")
+        return df["Close"].iloc[-1]
     except:
         return 0
 
-@st.cache_data(ttl=3600)
-def get_top_news_stocks():
-    results = []
-    for s in STOCK_LIST[:50]:
-        score = news_sentiment_score(s.replace(".NS", ""))
-        results.append((s, score))
-    sorted_stocks = sorted(results, key=lambda x: x[1], reverse=True)
-    return [s[0] for s in sorted_stocks[:5]]
+# ✅ Place order (Dummy logic – Replace with Angel One API)
+def place_order(symbol, side, qty):
+    print(f"✅ [SIMULATED] Placing {side} order for {symbol} - Qty: {qty}")
+    return {"status": True}
 
-# ✅ AI Strategy Signal
+# ✅ Telegram alert
+def send_telegram_alert(symbol, action, price, tp, sl):
+    try:
+        msg = f"🚨 {action} {symbol}\nPrice: {price}, TP: {tp}, SL: {sl}"
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg})
+    except Exception as e:
+        print("Telegram error:", e)
+
+# ✅ Send summary email
+def send_trade_summary_email():
+    if not os.path.exists("trade_log.csv"):
+        return
+    try:
+        df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+        body = df[df["timestamp"].dt.date == pd.Timestamp.now().date()].to_string(index=False)
+    except Exception as e:
+        body = f"Error parsing trade log: {e}"
+
+    msg = MIMEMultipart()
+    msg["Subject"] = "📈 Daily AI Trade Summary"
+    msg["From"] = EMAIL
+    msg["To"] = EMAIL
+    msg.attach(MIMEText(f"<html><body><pre>{body}</pre></body></html>", "html"))
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+            s.starttls()
+            s.login(EMAIL, EMAIL_PASS)
+            s.send_message(msg)
+    except Exception as e:
+        print("Email failed:", e)
+
+# ✅ Signal logic
 @st.cache_data(ttl=600)
-def get_strategy_signal(symbol):
+def get_signal(symbol):
     try:
         df = yf.download(symbol, period="15d", interval="1h")
         if len(df) < 30:
@@ -102,114 +95,75 @@ def get_strategy_signal(symbol):
         df["VolumeAvg"] = df["Volume"].rolling(window=20).mean()
         df["MACD"] = df["Close"].ewm(span=12).mean() - df["Close"].ewm(span=26).mean()
 
-        ema_signal = df["EMA20"].iloc[-1] > df["EMA50"].iloc[-1]
-        volume_signal = df["Volume"].iloc[-1] > 1.2 * df["VolumeAvg"].iloc[-1]
-        macd_signal = df["MACD"].iloc[-1] > 0
+        ema = df["EMA20"].iloc[-1] > df["EMA50"].iloc[-1]
+        volume = df["Volume"].iloc[-1] > 1.2 * df["VolumeAvg"].iloc[-1]
+        macd = df["MACD"].iloc[-1] > 0
 
-        return "BUY" if ema_signal and volume_signal and macd_signal else "HOLD"
+        return "BUY" if ema and volume and macd else "HOLD"
     except:
         return "HOLD"
 
-# ✅ UI: Smart Dashboard
+# ✅ Run bot
+def run_trading_bot(live=True, capital_per_trade=1000, tp_percent=2, sl_percent=1):
+    for symbol in STOCK_LIST[:10]:
+        signal = get_signal(symbol)
+        if signal != "BUY":
+            continue
 
-# Inputs
+        price = get_live_price(symbol)
+        if price <= 0:
+            continue
+
+        qty = max(int(capital_per_trade // price), 1)
+        tp_price = round(price * (1 + tp_percent / 100), 2)
+        sl_price = round(price * (1 - sl_percent / 100), 2)
+
+        if live:
+            place_order(symbol, "BUY", qty)
+
+        with open("trade_log.csv", "a") as f:
+            f.write(f"{datetime.now()},{symbol},BUY,{qty},{price},{tp_price},{sl_price}\n")
+
+        send_telegram_alert(symbol, "BUY", price, tp_price, sl_price)
+
+# ✅ Scheduler
+if "scheduler_started" not in st.session_state:
+    scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+    scheduler.add_job(lambda: run_trading_bot(live=True), "cron", hour=9, minute=15)
+    scheduler.add_job(send_trade_summary_email, "cron", hour=16, minute=30)
+    scheduler.start()
+    st.session_state.scheduler_started = True
+
+# ✅ UI Inputs
 capital = st.number_input("Capital per Trade (₹)", value=1000)
-tp = st.slider("Take Profit %", 1, 10, value=2)
-sl = st.slider("Stop Loss %", 1, 10, value=1)
+tp = st.slider("Take Profit %", 1, 10, 2)
+sl = st.slider("Stop Loss %", 1, 10, 1)
 
-# Get recommended stock from news + strategy
-top_stocks = get_top_news_stocks()
-symbol = top_stocks[0] if top_stocks else "RELIANCE.NS"
-signal = get_strategy_signal(symbol)
-data = yf.download(symbol, period="3mo", interval="1d")
-data['Signal'] = ["HOLD"] * len(data)
-data.loc[data.index[-1], 'Signal'] = signal
+top_stock = STOCK_LIST[0]
+signal = get_signal(top_stock)
+st.subheader(f"🔍 Signal for {top_stock}: {signal}")
 
-# Show Signal + Chart
-st.subheader(f"🔍 Signal for {symbol}: {signal}")
+data = yf.download(top_stock, period="3mo", interval="1d")
 fig = go.Figure()
 fig.add_candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])
 if signal == "BUY":
-    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[data['Close'].iloc[-1]], mode="markers", marker=dict(color="green", size=12), name="BUY"))
+    fig.add_trace(go.Scatter(x=[data.index[-1]], y=[data['Close'].iloc[-1]], mode="markers", marker=dict(color="green", size=10)))
 st.plotly_chart(fig)
 
-# ✅ Scheduler (Auto at 9:15 and 4:30)
-if "scheduler_started" not in st.session_state:
-    def auto_trade():
-        signal_df = pd.DataFrame([{"symbol": symbol, "signal": get_strategy_signal(symbol)}])
-        run_trading_bot(signal_df, live=True, capital_per_trade=capital, tp_percent=tp, sl_percent=sl)
-
-    def auto_summary():
-        send_trade_summary_email()
-
-    scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
-    scheduler.add_job(auto_trade, "cron", hour=9, minute=15)
-    scheduler.add_job(auto_summary, "cron", hour=16, minute=30)
-    scheduler.start()
-    st.session_state.scheduler_started = True
-    st.toast("✅ Auto trading and summary scheduled")
-
-# ✅ Portfolio Display
-st.header("📦 Live Portfolio")
-positions = get_fyers_positions()
-if positions:
-    df_positions = pd.DataFrame(positions)
-    df_positions["PnL ₹"] = df_positions["netQty"] * (df_positions["ltp"] - df_positions["avgPrice"])
-    st.dataframe(df_positions[["symbol", "netQty", "avgPrice", "ltp", "PnL ₹"]])
-else:
-    st.info("No open positions.")
-
-# ✅ Funds Display
-st.header("💰 Available Funds")
-funds = get_fyers_funds()
-if funds:
-    df_funds = pd.DataFrame(funds)
-    st.dataframe(df_funds[["title", "equityAmount", "collateralAmount", "net"]])
-else:
-    st.warning("Funds unavailable")
-
-# ✅ Cumulative PnL Chart + Trade Log Dropdown
+# ✅ Trade history chart
 if os.path.exists("trade_log.csv"):
-    df_log = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
-    df_log["timestamp"] = pd.to_datetime(df_log["timestamp"], errors="coerce")
-    df_log = df_log.dropna()
-    df_log["PnL"] = df_log.apply(lambda x: (x["tp"] - x["entry"]) * x["qty"] if x["action"] == "BUY" else (x["entry"] - x["tp"]) * x["qty"], axis=1)
-    df_log = df_log.sort_values("timestamp")
-    df_log["CumulativePnL"] = df_log["PnL"].cumsum()
+    df = pd.read_csv("trade_log.csv", names=["timestamp", "symbol", "action", "qty", "entry", "tp", "sl"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df["PnL"] = (df["tp"] - df["entry"]) * df["qty"]
+    df["CumulativePnL"] = df["PnL"].cumsum()
+    st.header("📊 Trade History PnL")
+    st.line_chart(df.set_index("timestamp")["CumulativePnL"])
 
-    st.header("📊 Cumulative PnL")
-    st.line_chart(df_log.set_index("timestamp")["CumulativePnL"])
-
-    stock_options = df_log["symbol"].dropna().unique().tolist()
-    selected_stock = st.selectbox("Select Stock", stock_options)
-
-    if selected_stock:
-        hist_data = yf.download(selected_stock, period="2mo", interval="1d")
-        fig2 = go.Figure()
-        fig2.add_candlestick(x=hist_data.index, open=hist_data["Open"], high=hist_data["High"], low=hist_data["Low"], close=hist_data["Close"])
-
-        trades = df_log[df_log["symbol"] == selected_stock]
-        for _, row in trades.iterrows():
-            color = "green" if row["action"] == "BUY" else "red"
-            label = row["action"].capitalize()
-            fig2.add_trace(go.Scatter(
-                x=[row["timestamp"]],
-                y=[row["entry"]],
-                mode="markers+text",
-                marker=dict(color=color, size=10),
-                name=label,
-                text=[label],
-                textposition="top center" if label == "Buy" else "bottom center"
-            ))
-        st.subheader(f"📈 Trade Log Chart - {selected_stock}")
-        st.plotly_chart(fig2)
-
-# ✅ Telegram Test
-if st.button("🔔 Test Telegram Alert"):
-    send_telegram_alert("TEST", "BUY", 100, 102, 98)
-    st.success("Telegram alert sent!")
-
-# ✅ Manual Summary Send
-if st.button("📤 Send Daily Summary Now"):
+# ✅ Manual trigger
+if st.button("📤 Send Summary Email Now"):
     send_trade_summary_email()
-    st.success("📧 Summary email sent!")
+    st.success("📧 Sent!")
+
+if st.button("🔔 Test Telegram"):
+    send_telegram_alert("DEMO", "BUY", 100, 102, 98)
+    st.success("Telegram alert sent!")
