@@ -1,6 +1,9 @@
-import os, json, pyotp
-from smartapi.smartConnect import SmartConnect
+import os
+import json
+import pyotp
+import requests
 
+# Load from environment
 api_key = os.getenv("ANGEL_API_KEY")
 client_code = os.getenv("ANGEL_CLIENT_ID")
 totp_secret = os.getenv("ANGEL_TOTP_SECRET")
@@ -8,27 +11,36 @@ totp_secret = os.getenv("ANGEL_TOTP_SECRET")
 totp = pyotp.TOTP(totp_secret).now()
 print("🔐 TOTP:", totp)
 
+url = "https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByPassword"
+
+headers = {
+    "X-ClientLocalIP": "127.0.0.1",
+    "X-ClientPublicIP": "127.0.0.1",
+    "X-MACAddress": "AA:BB:CC:DD:EE:FF",
+    "X-PrivateKey": api_key,
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}
+
+payload = {
+    "clientcode": client_code,
+    "password": totp  # TOTP as password
+}
+
+response = requests.post(url, headers=headers, json=payload)
+
 try:
-    obj = SmartConnect(api_key)
-    print("📨 Logging in with:", client_code)
+    data = response.json()
+    print("📦 Full response:", json.dumps(data, indent=2))
+    if not data.get("status"):
+        raise Exception(f"Login failed: {data.get('message')}")
 
-    session_data = obj.generateSession(client_code, totp)
-
-    if session_data is None:
-        raise Exception("Login failed: No session response received")
-
-    print("📦 Full session response:")
-    print(json.dumps(session_data, indent=2))
-
-    access_token = session_data["data"]["access_token"]
-
+    access_token = data["data"]["jwtToken"]
     with open("access_token.json", "w") as f:
-        json.dump({
-            "client_id": client_code,
-            "access_token": access_token
-        }, f)
+        json.dump({"client_id": client_code, "access_token": access_token}, f)
 
-    print("✅ Token saved successfully!")
-
+    print("✅ Access token saved.")
 except Exception as e:
-    print("❌ Error generating token:", e)
+    print("❌ Login failed:", e)
