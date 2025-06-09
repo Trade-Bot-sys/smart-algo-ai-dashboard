@@ -27,3 +27,5 @@ try:
     print("✅ Access token generated and saved.")
 except Exception as e:
     print("❌ Error generating token:", e)
+    import traceback
+    traceback.print_exc()
