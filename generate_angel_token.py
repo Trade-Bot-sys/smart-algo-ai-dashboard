@@ -14,7 +14,7 @@ totp = pyotp.TOTP(totp_secret).now()
 # ✅ Initialize SmartConnect and generate session
 try:
     obj = SmartConnect(api_key)
-    session_data = obj.generateSession(api_key, client_code, totp)
+    session_data = obj.generateSession(client_code, totp)
     access_token = session_data["data"]["access_token"]
 
     # ✅ Save access token to JSON file
