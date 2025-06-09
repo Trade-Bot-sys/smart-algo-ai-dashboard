@@ -31,7 +31,9 @@ jobs:
         pip install smartapi-python==1.1.0 pyotp logzero twisted pyOpenSSL autobahn service-identity
     - name: 🔍 Check logzero is installed
       run: pip show logzero
-
+    - name: 🩹 Patch SmartAPI bug (true → True)
+      run: |
+        sed -i 's/or true:/or True:/g' $(python -c "import smartapi; print(smartapi.__file__.replace('__init__.py', 'smartConnect.py'))")
     - name: 🔐 Generate and save token
       run: |
         python generate_angel_token.py
